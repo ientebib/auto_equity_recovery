@@ -1,0 +1,54 @@
+[tool.black]
+line-length = 88
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
+[tool.ruff]
+line-length = 88
+select = ["E", "F", "W", "I", "D", "B"]
+ignore = ["D100", "D104", "D107", "D203", "D212", "D415"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.setuptools]
+packages = ["lead_recovery"]
+
+[tool.setuptools.package-data]
+lead_recovery = ["prompts/openai_prompt.txt", "sql/*.sql"]
+
+[project]
+name = "lead-recovery"
+version = "0.1.0"
+description = "Pipeline for recovering leads, summarizing conversations and reporting."
+requires-python = ">=3.10"
+authors = [{ name = "Kavak" }]
+dependencies = [
+    "python-dotenv",
+    "pandas",
+    "redshift_connector",
+    "google-cloud-bigquery",
+    "openai",
+    "tenacity",
+    "pydantic",
+    "pydantic-settings",
+    "typer[all]",
+    "tqdm",
+    "tiktoken",
+    "pyarrow",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest", 
+    "black", 
+    "isort", 
+    "ruff", 
+    "pre-commit",
+    "pip-tools"
+]
+
+[project.scripts]
+lead-recovery = "lead_recovery.cli:main" 
