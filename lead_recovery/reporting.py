@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 def to_csv(df: pd.DataFrame, path: Path) -> Path:
     """Write DataFrame to *path* (CSV) and return the path."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    df.to_csv(path, index=False)
+    df.to_csv(path, index=False, encoding='utf-8-sig')  # Use utf-8-sig encoding for better compatibility with Spanish characters in Excel
     logger.info("CSV written to %s", path)
     return path
 

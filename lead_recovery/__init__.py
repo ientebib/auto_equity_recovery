@@ -1,3 +1,5 @@
+__version__ = "0.1.0"
+
 """lead_recovery package
 
 This lightweight package wraps the existing top‑level modules so they can be
@@ -18,6 +20,7 @@ _modules: _List[str] = [
     "utils",
     "summarizer",
     "reporting",
+    "recipe_loader",
     "cli",
 ]
 

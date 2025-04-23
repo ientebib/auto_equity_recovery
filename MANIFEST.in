@@ -1,0 +1,15 @@
+# Include all recipe files
+recursive-include recipes *.sql
+recursive-include recipes *.txt
+recursive-include recipes *.yml
+
+# Include the default prompt within the package
+# (Might be redundant if already covered by package_data in pyproject.toml,
+# but doesn't hurt to be explicit)
+graft lead_recovery/prompts
+
+# Exclude Python cache files etc.
+global-exclude *.py[cod]
+global-exclude __pycache__
+prune .pytest_cache
+prune .ruff_cache 

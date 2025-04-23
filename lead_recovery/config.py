@@ -18,7 +18,12 @@ from pydantic import Field, validator
 # Logging configuration (importing this module sets global logging defaults)
 # ---------------------------------------------------------------------------- #
 LOG_FORMAT = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
-logging.basicConfig(format=LOG_FORMAT, level=logging.INFO)
+# Only configure the root logger if the application running this module
+# has not configured logging yet.  This prevents 3rd‑party code from
+# changing global logging behaviour unexpectedly when it merely
+# imports ``lead_recovery``.
+if not logging.getLogger().handlers:
+    logging.basicConfig(format=LOG_FORMAT, level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -40,10 +45,18 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str
 
     # ------------------------------------------------------------------ #
-    # SQL file paths (can be overridden for testing)
-    # ------------------------------------------------------------------ #
-    RS_SQL_PATH: Path = Path(__file__).with_suffix("").parent / "sql" / "redshift_query.sql"
-    BQ_SQL_PATH: Path = Path(__file__).with_suffix("").parent / "sql" / "bigquery_query.sql"
+    # SQL file paths (can be overridden for testing) -------------------- #
+    # We compute absolute paths so that CLI commands work regardless of the
+    # shell's current working directory.
+    PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent
+
+    # Default recipe (profiling_incomplete)
+    RS_SQL_PATH: Path = PROJECT_ROOT / "recipes" / "profiling_incomplete" / "redshift.sql"
+    BQ_SQL_PATH: Path = PROJECT_ROOT / "recipes" / "profiling_incomplete" / "bigquery.sql"
+
+    # Optional: override the GCP project used by google‑cloud‑bigquery.
+    # Leave unset to rely on Application‑Default credentials logic.
+    BQ_PROJECT: str | None = None
 
     # ------------------------------------------------------------------ #
     # Pipeline parameters

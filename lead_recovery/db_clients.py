@@ -87,8 +87,18 @@ class BigQueryClient:
     """Wrapper around google-cloud-bigquery for Pandas results."""
 
     def __init__(self) -> None:
+        """Instantiate a BigQuery client.
+
+        If the optional ``settings.BQ_PROJECT`` is provided (e.g. via env
+        var), pass it explicitly so the code can run outside of GCP where
+        ADC might not infer a default project.  Otherwise fall back to the
+        default google‑cloud‑bigquery behaviour.
+        """
         try:
-            self._client = bigquery.Client()
+            project = getattr(settings, "BQ_PROJECT", None)
+            self._client = bigquery.Client(project=project) if project else bigquery.Client()
+            if project:
+                logger.debug("Initialised BigQuery client for project %s", project)
         except Exception:  # noqa: BLE001
             logger.exception("Failed to instantiate BigQuery client")
             raise
@@ -137,45 +147,14 @@ class BigQueryClient:
             job = self._client.query(sql, job_config=job_config)
             
             # Use an iterator to handle potentially large results
+            # Convert directly to DataFrame (simplification)
             results_iterator = job.result()
+            final_df = results_iterator.to_dataframe()
             
-            # Create a temporary directory for parquet files
-            temp_dir = Path(tempfile.mkdtemp(prefix="bq_results_"))
-            logger.debug("Using temporary directory for BQ results: %s", temp_dir)
-            
-            parquet_files = []
-            total_rows = 0
-            
-            # Iterate through pages (chunks) of results
-            for i, page in enumerate(results_iterator.pages):
-                page_df = page.to_dataframe()
-                if not page_df.empty:
-                    file_path = temp_dir / f"results_part_{i}_{uuid.uuid4()}.parquet"
-                    page_df.to_parquet(file_path, index=False, engine='pyarrow')
-                    parquet_files.append(file_path)
-                    total_rows += len(page_df)
-                    logger.debug("Wrote page %d (%d rows) to %s", i, len(page_df), file_path)
-                else:
-                    logger.debug("Page %d was empty, skipping.", i)
-
             duration = time.time() - start_time
-            logger.debug("BigQuery query initial fetch completed in %.2f seconds", duration)
-
-            if not parquet_files:
-                 logger.warning("BigQuery query returned no data.")
-                 return pd.DataFrame() # Return empty DataFrame if no results
-
-            # Read all parquet files back into a single DataFrame
-            logger.debug("Reading %d parquet files back into DataFrame...", len(parquet_files))
-            read_start = time.time()
-            # Pandas can read a list of paths directly
-            final_df = pd.read_parquet(parquet_files, engine='pyarrow') 
-            read_duration = time.time() - read_start
-            logger.debug("Parquet read completed in %.2f seconds", read_duration)
-
             logger.info(
                 "BigQuery query processing complete. Total rows: %d. Total time: %.2f seconds", 
-                total_rows, time.time() - start_time
+                len(final_df), time.time() - start_time
             )
             return final_df
 
@@ -183,12 +162,13 @@ class BigQueryClient:
             logger.exception("BigQuery query failed")
             raise
         finally:
-            # Clean up temporary directory and files
-            if temp_dir and temp_dir.exists():
-                 try:
-                     for item in temp_dir.iterdir():
-                         item.unlink()
-                     temp_dir.rmdir()
-                     logger.debug("Cleaned up temporary directory: %s", temp_dir)
-                 except Exception as e:
-                     logger.error("Failed to clean up temporary directory %s: %s", temp_dir, e) 
+            pass
+            # Clean up temporary directory and files (No longer needed)
+            # if temp_dir and temp_dir.exists():
+            #      try:
+            #          for item in temp_dir.iterdir():
+            #              item.unlink()
+            #          temp_dir.rmdir()
+            #          logger.debug("Cleaned up temporary directory: %s", temp_dir)
+            #      except Exception as e:
+            #          logger.error("Failed to clean up temporary directory %s: %s", temp_dir, e) 

@@ -38,6 +38,8 @@ dependencies = [
     "tqdm",
     "tiktoken",
     "pyarrow",
+    "pyyaml",
+    "streamlit>=1.0",
 ]
 
 [project.optional-dependencies]

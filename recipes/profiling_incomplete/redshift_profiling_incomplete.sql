@@ -1,7 +1,12 @@
+-- Recipe: Profiling_Incomplete  (RENAMED FILE: redshift_profiling_incomplete.sql)
+-- Source: AutoEquity Leads with NO profiling completed
+-- ---------------------------------------------------------------------------
+-- NOTE: Original file redshift.sql renamed for clarity.
+
 -- Redshift Query: Get Target AutoEquity Leads for Bot 1 (No Profiling Completed)
 -- IMPORTANT: Phone number formatting must match between Redshift and BigQuery
 -- The RIGHT(phone_number, 10) logic extracts the last 10 digits of phone numbers
--- This MUST be identical to the phone number processing in bigquery_query.sql
+-- This MUST be identical to the phone number processing in bigquery_profiling_incomplete.sql
 
 WITH latest_lead_per_email AS (
   -- Find the most recent lead record for each cleaned email address
@@ -21,11 +26,10 @@ WITH latest_lead_per_email AS (
     ) AS rn
   FROM financing_acceptation_api_global_refined.financing_leads_data ld
   WHERE
-    ld.create_date >= DATEADD(month, -3, CURRENT_DATE) -- Align with 3-month BQ history
-    AND ld.product = 'f079451e-04dd-4741-b7e0-ee6ddedc6b7d' -- *** Filter ONLY for AutoEquity product ID ***
+    ld.create_date >= DATEADD(month, -3, CURRENT_DATE)
+    AND ld.product = 'f079451e-04dd-4741-b7e0-ee6ddedc6b7d'
 ),
 latest_intent_per_email AS (
-  -- Find the most recent intent record for each cleaned email address
   SELECT
     i.id AS intent_id, i.email, i.name, i.second_name, i.last_name,
     i.second_last_name, i.phone_number, i.offer_option_selected,
@@ -41,23 +45,20 @@ latest_intent_per_email AS (
     ) AS rn
   FROM kuna_data_api_global_refined.intents i
 )
--- Final selection joining the latest lead and latest intent, applying all filters
 SELECT
-  ll.id AS lead_id,          -- Unique Lead Identifier
-  ll.user_id,                -- User Identifier
-  ll.create_date,            -- Lead Creation Date
-  li.name,                   -- First Name
-  li.last_name,              -- Last Name
-  -- Cleaned Phone Number (CRITICAL - Verify RIGHT(10) logic is correct for your data)
+  ll.id AS lead_id,
+  ll.user_id,
+  ll.create_date,
+  li.name,
+  li.last_name,
   RIGHT(li.phone_number, 10) AS cleaned_phone_number
 FROM latest_lead_per_email ll
 JOIN latest_intent_per_email li ON ll.cleaned_email = li.cleaned_email AND li.rn = 1
 WHERE
-  ll.rn = 1 -- Ensure we only take the latest lead per email
-  -- Filters confirming they didn't progress:
+  ll.rn = 1
   AND ll.profiling_status IS NULL
   AND ll.vehicle_id IS NULL
   AND li.offer_option_selected IS NULL
   AND ll.simulation_id IS NULL
   AND ll.handoff_status IS NULL
-  AND ll.transaction_id IS NULL;
+  AND ll.transaction_id IS NULL; 

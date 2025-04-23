@@ -49,10 +49,12 @@ coverage.xml
 *.py,cover
 .hypothesis/
 .pytest_cache/
+cover/
 
 # Translations
 *.mo
 *.pot
+*.po
 
 # Django stuff:
 *.log
@@ -81,17 +83,17 @@ profile_default/
 ipython_config.py
 
 # pyenv
-#   For a library or package, you might want to ignore these files since the code is
+#   For a library or application, you might want to ignore these files since the code is
 #   intended to run in multiple environments; otherwise, check them in:
 # .python-version
 
 # pipenv
-#   According to pypa/pipenv#199 Pipfile.lock is recommended to be checked in.
-#   If you choose to ignore Pipfile.lock, see pipenv's guidance on managing dependencies:
-#   https://pipenv.pypa.io/en/latest/advanced/#managing-multiple-pipenv-environments
+#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
+#   However, in case of collaboration, if have platform-specific dependencies, or dependencies
+#   pinned to git commits, then perhaps ignore file:
 # Pipfile.lock
 
-# PEP 582; used by PDM, Flit and potentially other packaging tools
+# PEP 582; used by PDM, Pyflow and potentially other tools.
 __pypackages__/
 
 # Celery stuff
@@ -128,7 +130,7 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# pytype static analyzer
+# pytype static analysis results
 .pytype/
 
 # Cython debug symbols
