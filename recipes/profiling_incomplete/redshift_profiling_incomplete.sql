@@ -61,4 +61,5 @@ WHERE
   AND li.offer_option_selected IS NULL
   AND ll.simulation_id IS NULL
   AND ll.handoff_status IS NULL
-  AND ll.transaction_id IS NULL; 
+  AND ll.transaction_id IS NULL
+  limit 2000; 

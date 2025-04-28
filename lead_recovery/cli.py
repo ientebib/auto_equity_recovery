@@ -142,6 +142,13 @@ def summarize(
     csv_output_path = output_dir / f"{base_filename}.csv"
     html_output_path = output_dir / f"{base_filename}.html"
 
+    # Use the provided expected keys, or log a warning if none are available
+    # (This scenario is less likely when called via 'run', but good practice)
+    if not expected_yaml_keys_internal:
+        logger.warning("No expected_yaml_keys provided to summarize function. Output might be incomplete.")
+        # Define a minimal fallback if absolutely necessary, or let it fail if keys are mandatory
+        # expected_yaml_keys_internal = [] # Or raise error
+
     convos_path = output_dir / "conversations.csv"
     if not convos_path.is_file():
         # Gracefully allow recipes without a BigQuery step
@@ -151,29 +158,44 @@ def summarize(
         leads_path = output_dir / "leads.csv"
         if leads_path.exists():
             leads_df = pd.read_csv(leads_path)
-            for col in ["result", "stall_reason", "key_interaction", "suggestion", "summary"]:
-                leads_df[col] = "N/A" if col != "stall_reason" else "NO_OUTBOUND"
+            # Populate leads with defaults based on *expected* keys
+            if expected_yaml_keys_internal:
+                for col in expected_yaml_keys_internal:
+                    # Assign a reasonable default (e.g., 'NO_DATA' or 'N/A')
+                    default_val = 'NO_DATA' # Example default
+                    if col == 'prior_recovery_attempt_count': default_val = 0
+                    leads_df[col] = default_val
+            else:
+                logger.warning("Cannot add default summary columns as expected_yaml_keys are missing.")
+
             to_csv(leads_df, csv_output_path) # Use new path
             to_html(leads_df, html_output_path) # Use new path
         else:
             logger.warning("leads.csv not found either, cannot create empty analysis file.")
-            return
+        return
 
     convos_df = pd.read_csv(convos_path)
 
-    # If there is no conversation data, skip summarisation and just merge empty fields
+    # If there is no conversation data, skip summarisation and just merge empty fields based on expected keys
     if convos_df.empty:
         logger.info("No conversation data found – skipping OpenAI summarisation.")
         leads_df = pd.read_csv(output_dir / "leads.csv")
-        for col in ["result", "stall_reason", "key_interaction", "suggestion", "summary"]:
-            leads_df[col] = "N/A" if col != "stall_reason" else "NO_OUTBOUND"
+        if expected_yaml_keys_internal:
+            for col in expected_yaml_keys_internal:
+                # Assign a reasonable default
+                default_val = 'NO_DATA' # Example default
+                if col == 'prior_recovery_attempt_count': default_val = 0
+                leads_df[col] = default_val
+        else:
+            logger.warning("Cannot add default summary columns as expected_yaml_keys are missing.")
+
         to_csv(leads_df, csv_output_path) # Use new path
         to_html(leads_df, html_output_path) # Use new path
         return
 
     # Initialize summarizer, passing keys if provided
     summarizer = ConversationSummarizer(
-        prompt_template_path=prompt_template_path, 
+        prompt_template_path=prompt_template_path,
         expected_yaml_keys=expected_yaml_keys_internal # Pass the keys
     )
     
@@ -219,16 +241,27 @@ def summarize(
     
     # Convert results list of dicts to DataFrame
     # The keys of the dictionaries become the columns
-    summaries_df = pd.DataFrame(summary_results)
-    
-    # Define expected summary columns to ensure they exist, fill with defaults if needed
-    expected_summary_cols = ['result', 'stall_reason', 'key_interaction', 'suggestion', 'summary']
-    for col in expected_summary_cols:
-        if col not in summaries_df.columns:
-            logger.warning("Column '%s' missing from summarization results. Filling with default.", col)
-            # Determine appropriate default based on column (e.g., 'N/A' or 'OTHER')
-            default_val = "OTHER" if col == 'stall_reason' else "N/A"
-            summaries_df[col] = default_val 
+    summaries_df = pd.DataFrame(summary_results) if summary_results else pd.DataFrame() # Handle empty results
+
+    # Ensure required phone column exists if summaries_df is not empty
+    if not summaries_df.empty and "cleaned_phone_number" not in summaries_df.columns:
+         # Check if it was added to error dicts etc. If not, add it.
+         # This case needs careful handling depending on how errors are structured.
+         logger.error("Summarization results missing 'cleaned_phone_number'. Merging might fail.")
+         # Potentially add the column if it can be derived, or handle the error.
+
+    # Ensure all *expected* summary columns exist in the summaries_df, fill with defaults if needed
+    if expected_yaml_keys_internal:
+        for col in expected_yaml_keys_internal:
+            if col not in summaries_df.columns:
+                logger.warning("Column '%s' missing from summarization results. Filling with default.", col)
+                # Determine appropriate default based on column
+                default_val = 'N/A' # Generic default
+                if col == 'prior_recovery_attempt_count': default_val = 0
+                # Add more specific defaults if needed for other known keys
+                summaries_df[col] = default_val
+    else:
+        logger.warning("No expected_yaml_keys provided; cannot ensure all summary columns exist.")
 
     # --- Merging --- 
     leads_df = pd.read_csv(output_dir / "leads.csv")
@@ -243,7 +276,7 @@ def summarize(
          logger.error("'cleaned_phone_number' column missing from summarization results. Cannot merge.")
          # Handle this case - maybe create an empty summaries_df if it failed entirely?
          if not summary_results: # If no summaries were processed at all
-             summaries_df = pd.DataFrame(columns=['cleaned_phone_number'] + expected_summary_cols)
+             summaries_df = pd.DataFrame(columns=['cleaned_phone_number'] + expected_yaml_keys_internal)
          else: # Should not happen if we add default dicts on error, but as fallback:
              raise typer.Exit(1)
 
@@ -259,20 +292,21 @@ def summarize(
         merged_df.drop(columns=['cleaned_phone_number'], inplace=True)
         
     # Determine the correct summary columns based on expected keys if provided
-    summary_cols_to_fill = expected_yaml_keys_internal or [
-        'result', 'stall_reason', 'key_interaction', 'suggestion', 'summary' # Default fallback
-    ]
-    
+    # Use the expected_yaml_keys_internal directly
+    summary_cols_to_fill = expected_yaml_keys_internal or [] # Fallback to empty list if None
+
     # Fill NaN values that might result from the left merge (leads with no summary)
     # Use a dynamic approach based on expected keys
     fillna_values = {
-        key: 'N/A' for key in summary_cols_to_fill 
+        # Use a generic default like 'N/A' or 'MISSING_SUMMARY'
+        key: 'MISSING_SUMMARY' for key in summary_cols_to_fill
     }
-    # Override defaults for common keys if they exist in the list
-    if 'result' in fillna_values: fillna_values['result'] = 'Merge Error or No Summary'
-    if 'stall_reason' in fillna_values: fillna_values['stall_reason'] = 'OTHER'
-    if 'reason_for_drop' in fillna_values: fillna_values['reason_for_drop'] = 'OTHER'
-    if 'summary' in fillna_values: fillna_values['summary'] = 'N/A - Check logs or original data'
+    # Override specific defaults for known keys if they exist in the list
+    # Make overrides conditional
+    if 'prior_recovery_attempt_count' in fillna_values: fillna_values['prior_recovery_attempt_count'] = 0 # Keep default 0
+    # Add other specific overrides if needed (e.g., primary_stall_reason_code -> 'NO_SUMMARY_DATA')
+    if 'primary_stall_reason_code' in fillna_values: fillna_values['primary_stall_reason_code'] = 'NO_SUMMARY_DATA'
+    if 'analysis_summary' in fillna_values: fillna_values['analysis_summary'] = 'Lead data exists, but no summary generated.'
 
     # Only fillna for columns that actually exist in merged_df and are in our target list
     cols_to_fill = {k: v for k, v in fillna_values.items() if k in merged_df.columns and k in summary_cols_to_fill}

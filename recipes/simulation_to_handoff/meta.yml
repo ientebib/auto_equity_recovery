@@ -1,0 +1,53 @@
+# ========================================================================
+# META CONFIGURATION FOR RECIPE: simulation_to_handoff_v12
+# ========================================================================
+
+# --- Basic Recipe Identification ---
+name: "simulation_to_handoff_v12"
+dashboard_title: "Recuperación Simulación-Hand-Off v12 (Context Rich)" # Updated title
+
+# --- Data Source Configuration ---
+redshift_sql: simulation_to_handoff_redshift.sql
+bigquery_sql: simulation_to_handoff_bigquery.sql
+
+# --- LLM Analysis Configuration ---
+prompt_file: simulation_to_handoff_prompt_v12.txt # Updated prompt file reference
+summary_format: YAML
+
+# --- Output Structure Definition ---
+# Defines the columns and their order in the final output CSV/DataFrame
+output_columns:
+  # Core lead info (adjust if needed)
+  - folio_id
+  - nombre
+  - telefono
+  - monto_preaprobado
+  - profiling_approval_date
+
+  # LLM Analysis Output (MUST match the order in the prompt's final YAML block)
+  - analysis_summary
+  - inferred_stall_stage
+  - primary_stall_reason_code
+  - prior_recovery_attempt_count
+  - last_user_message_text
+  - last_kuna_message_text
+  - stall_summary
+  - next_action_code
+  - next_action_context
+  - suggested_message_es
+
+# --- LLM Output Validation ---
+# List of keys the Python script expects to find in the LLM's YAML output.
+# MUST match the keys the prompt is instructed to generate.
+expected_yaml_keys:
+  - analysis_summary
+  - inferred_stall_stage
+  - primary_stall_reason_code
+  - prior_recovery_attempt_count
+  - last_message_sender
+  - last_user_message_text
+  - last_kuna_message_text
+  - stall_summary
+  - next_action_code
+  - next_action_context
+  - suggested_message_es

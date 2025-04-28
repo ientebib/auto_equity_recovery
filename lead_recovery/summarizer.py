@@ -26,7 +26,7 @@ class ConversationSummarizer:
     def __init__(
         self,
         model: str = "gpt-4.1-mini",
-        max_tokens: int = 512,
+        max_tokens: int = 4096,
         prompt_template_path: str | Path | None = None,
         expected_yaml_keys: List[str] | None = None,
     ):
@@ -81,46 +81,86 @@ class ConversationSummarizer:
     @retry(wait=wait_exponential(multiplier=2, min=2, max=10), stop=stop_after_attempt(3))
     def _call_openai(self, messages: List[Dict[str, str]]) -> str:
         """Internal helper wrapped with exponential backoff retry."""
-        # Use tiktoken for more accurate prompt token count
+        # Note: Using o4-mini model which uses the Responses API.
+        target_model = "o4-mini"
+        reasoning_effort = "low"
+
+        # Input token calculation might differ slightly for Responses API, but tiktoken is a good estimate.
         try:
-            encoding = tiktoken.encoding_for_model(self.model)
+            # Use a known base model for tiktoken if target_model isn't directly supported yet
+            # (e.g., gpt-4 as a proxy for o4-mini's tokenizer behavior)
+            encoding = tiktoken.encoding_for_model("gpt-4")
             num_tokens = sum(len(encoding.encode(msg["content"])) for msg in messages)
-            logger.debug("Calling OpenAI API (model: %s) with %d tokens in prompt", self.model, num_tokens)
-        except Exception: # Handle cases where encoding might fail (e.g., model not found)
-             logger.warning("Could not get tiktoken encoding for model '%s'. Falling back to word count.", self.model)
-             word_count = sum(len(msg["content"].split()) for msg in messages) 
-             logger.debug("Calling OpenAI API (model: %s) with ~%d words in prompt", self.model, word_count)
-        
+            logger.debug(
+                "Estimating input tokens for %s using gpt-4 encoding: %d tokens",
+                target_model, num_tokens
+            )
+        except Exception as e:
+            logger.warning(
+                "Could not get tiktoken encoding for base model (gpt-4). Falling back to word count. Error: %s", e
+            )
+            word_count = sum(len(msg["content"].split()) for msg in messages)
+            logger.debug(
+                "Calling OpenAI Responses API (model: %s) with ~%d words in prompt",
+                target_model, word_count
+            )
+
         start_time = time.time()
-        rsp = self._client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            max_tokens=self.max_tokens,
+        # Use the Responses API
+        response = self._client.responses.create(
+            model=target_model,
+            input=messages,
+            reasoning={"effort": reasoning_effort},
+            # Pass the existing max_tokens as max_output_tokens.
+            # WARNING: This includes reasoning tokens AND output tokens.
+            # If reasoning uses many tokens, visible output might be truncated.
+            # Consider increasing this value if summaries are incomplete.
+            max_output_tokens=self.max_tokens,
+            # store=False # Optional: Set to False if you don't need state for follow-ups
         )
         duration = time.time() - start_time
-        
-        content = rsp.choices[0].message.content.strip()
-        # Optionally, count response tokens too
-        try:
-            # Check if encoding was successfully obtained earlier
-            if "encoding" in locals():
-                response_tokens = len(encoding.encode(content))
-                logger.debug(
-                    "OpenAI API call completed in %.2f seconds. Response tokens: %d",
-                    duration, response_tokens
-                )
-            else:
-                # If encoding failed, log word count as fallback
-                logger.debug(
-                    "OpenAI API call completed in %.2f seconds. Response words: ~%d (tiktoken encoding failed earlier)",
-                    duration, len(content.split())
-                )
-        except Exception as e: # Catch potential errors during encoding/logging, though less likely now
-            logger.warning("Could not calculate response size: %s. Falling back to word count.", e)
-            logger.debug(
-                "OpenAI API call completed in %.2f seconds. Response words: ~%d",
-                duration, len(content.split())
+
+        # Handle potential incomplete responses due to token limits
+        if response.status == "incomplete" and response.incomplete_details.reason == "max_output_tokens":
+            logger.warning(
+                "OpenAI API call for model %s was incomplete due to max_output_tokens (%d). Reasoning might have consumed tokens. Duration: %.2fs",
+                target_model, self.max_tokens, duration
             )
+            # Return potentially partial text, or handle as an error depending on requirements
+            content = response.output_text.strip() if response.output_text else ""
+            if not content:
+                 logger.error("Response was incomplete (max_output_tokens) and generated no visible output text.")
+                 # Raise an exception or return an error string
+                 raise RuntimeError("OpenAI response incomplete due to max_output_tokens with no visible output.")
+            else:
+                 logger.warning("Returning partial output due to incomplete response (max_output_tokens).")
+
+        elif response.status != "completed":
+             logger.error(
+                 "OpenAI API call for model %s failed or was incomplete for reasons other than token limits. Status: %s. Duration: %.2fs",
+                 target_model, response.status, duration
+             )
+             raise RuntimeError(f"OpenAI API call failed with status: {response.status}")
+        else:
+            # Extract content from output_text for Responses API
+            content = response.output_text.strip()
+
+        # Log token usage information from the response object
+        try:
+            input_tokens = response.usage.input_tokens
+            output_tokens = response.usage.output_tokens
+            reasoning_tokens = response.usage.output_tokens_details.reasoning_tokens
+            visible_output_tokens = output_tokens - reasoning_tokens
+
+            logger.debug(
+                "OpenAI API call completed in %.2f seconds. Usage: Input=%d, Output=%d (Reasoning=%d, Visible=%d), Total=%d",
+                duration, input_tokens, output_tokens, reasoning_tokens, visible_output_tokens, response.usage.total_tokens
+            )
+        except AttributeError:
+            logger.warning("Could not log detailed token usage (usage object might be missing or structured differently). Duration: %.2fs", duration)
+        except Exception as e:
+            logger.warning("Error logging token usage: %s. Duration: %.2fs", e, duration)
+
 
         return content
 
@@ -143,20 +183,21 @@ class ConversationSummarizer:
         try:
             # Limit the conversation to avoid token limit issues
             # Taking first 5 and last 15 messages if more than 20 messages
-            if len(conv_df) > 20:
-                first_n = min(5, len(conv_df))
-                last_n = min(15, len(conv_df) - first_n)
-                truncated_df = pd.concat([
-                    conv_df.head(first_n), 
-                    conv_df.tail(last_n)
-                ])
-                logger.debug("Truncated conversation from %d to %d messages", 
-                           len(conv_df), len(truncated_df))
-                conv_df = truncated_df
+            # if len(conv_df) > 20:
+            #     first_n = min(5, len(conv_df))
+            #     last_n = min(15, len(conv_df) - first_n)
+            #     truncated_df = pd.concat([
+            #         conv_df.head(first_n), 
+            #         conv_df.tail(last_n)
+            #     ])
+            #     logger.debug("Truncated conversation from %d to %d messages", 
+            #                len(conv_df), len(truncated_df))
+            #     conv_df = truncated_df
             
             # Format the conversation
-            conversation_text = "\n".join(
-                f"{getattr(row, 'msg_from', 'Unknown Sender')}: {getattr(row, 'message', 'No Message')}" 
+            conversation_text = "\\n".join(
+                # Format: [YYYY-MM-DD HH:MM:SS] Sender: Message
+                f"[{str(getattr(row, 'creation_time', 'Unknown Time'))[:19]}] {getattr(row, 'msg_from', 'Unknown Sender')}: {getattr(row, 'message', 'No Message')}"
                 for row in conv_df.itertuples(index=False)
             )
             

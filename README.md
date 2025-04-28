@@ -121,6 +121,7 @@ Each recipe is a directory under `recipes/` containing:
 ### Available Recipes
 - `profiling_incomplete`: Targets leads who initiated but didn't complete profiling
 - `handoffapp_to_bill`: Targets leads in the handoff application process
+- `simulation_to_handoff`: target leads who were approved but never continued with the process
 
 ### Creating New Recipes
 1. Create a new directory under `recipes/`
@@ -237,26 +238,6 @@ lead_recovery_project/
    - Adjust BQ_BATCH_SIZE for memory constraints
    - Modify max_workers for summarization
    - Check for inefficient SQL queries
-
-## Web Dashboard (Experimental)
-
-A simple web interface built with Streamlit is available for easier execution:
-
-1. Ensure Streamlit and other dependencies are installed:
-   ```bash
-   # Install the main package and its dependencies
-   pip install .
-   # If you haven't already, install streamlit
-   # pip install streamlit
-   ```
-   *(Note: `streamlit` is now included in the project dependencies, so `pip install .` should install it automatically.)*
-
-2. Run the dashboard from the project root directory:
-   ```bash
-   streamlit run dashboard.py
-   ```
-
-This allows selecting recipes, optionally setting a 'since' date, running the pipeline, and viewing/downloading the results directly in the browser.
 
 ## License
 

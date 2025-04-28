@@ -6,14 +6,16 @@ output_columns:
   - last_name
   - cleaned_phone
   - analysis_summary
-  - stall_stage
-  - stall_reason_code
-  - last_agent_action
-  - last_lead_response
-  - stall_context
-  - key_blocker
-  - next_action
-  - contact_priority
+  - inferred_stall_stage
+  - primary_stall_reason_code
+  - prior_recovery_attempt_count
+  - last_message_sender
+  - last_user_message_text
+  - last_kuna_message_text
+  - stall_summary
+  - next_action_code
+  - next_action_context
+  - suggested_message_es
 dashboard_title: "Profiling‑Incomplete Recovery"
 summary_format: YAML
 redshift_sql: redshift_profiling_incomplete.sql
@@ -21,11 +23,13 @@ bigquery_sql: bigquery_profiling_incomplete.sql
 prompt_file: prompt_profiling_incomplete.txt
 expected_yaml_keys:
   - analysis_summary
-  - stall_stage
-  - stall_reason_code
-  - last_agent_action
-  - last_lead_response
-  - stall_context
-  - key_blocker
-  - next_action
-  - contact_priority 
+  - inferred_stall_stage
+  - primary_stall_reason_code
+  - prior_recovery_attempt_count
+  - last_message_sender
+  - last_user_message_text
+  - last_kuna_message_text
+  - stall_summary
+  - next_action_code
+  - next_action_context
+  - suggested_message_es 
