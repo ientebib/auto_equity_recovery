@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import Dict, Any, Optional
 
 # Pydantic v2 moved BaseSettings to pydantic_settings; fall back if older v1
 try:
@@ -26,6 +27,8 @@ if not logging.getLogger().handlers:
     logging.basicConfig(format=LOG_FORMAT, level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# The currently active settings instance, can be overridden for testing
+_CURRENT_SETTINGS = None
 
 class Settings(BaseSettings):
     """Validated settings loaded from environment variables or .env file."""
@@ -40,9 +43,10 @@ class Settings(BaseSettings):
     REDSHIFT_PORT: int = 5439
 
     # ------------------------------------------------------------------ #
-    # OpenAI API
+    # OpenAI API and Google Credentials
     # ------------------------------------------------------------------ #
-    OPENAI_API_KEY: str
+    OPENAI_API_KEY: str | None = None
+    GOOGLE_CREDENTIALS_PATH: str | None = None
 
     # ------------------------------------------------------------------ #
     # SQL file paths (can be overridden for testing) -------------------- #
@@ -81,11 +85,47 @@ class Settings(BaseSettings):
         return path
 
 
-# Instantiate a global settings object for convenient import
-settings = Settings()
+def get_settings(override_values: Optional[Dict[str, Any]] = None) -> Settings:
+    """Get the current settings, with optional overrides for testing.
+    
+    Args:
+        override_values: Optional dictionary of settings values to override
+        
+    Returns:
+        Settings instance with overrides applied if any
+    
+    This function allows tests to override settings without modifying
+    global configuration.
+    """
+    global _CURRENT_SETTINGS
+    
+    # If no overrides and we already have settings, return cached instance
+    if override_values is None and _CURRENT_SETTINGS is not None:
+        return _CURRENT_SETTINGS
+    
+    # Create a new Settings instance
+    if override_values:
+        # Apply overrides for testing
+        settings_instance = Settings(**override_values)
+        logger.debug("Created settings with overrides: %s", 
+                    {k: "****" if k == "OPENAI_API_KEY" else v for k, v in override_values.items()})
+    else:
+        # Normal settings from environment
+        settings_instance = Settings()
+    
+    # Store as current if no overrides
+    if override_values is None:
+        _CURRENT_SETTINGS = settings_instance
+    
+    # Hide sensitive info in logs
+    safe_dict = settings_instance.dict()
+    if "OPENAI_API_KEY" in safe_dict and safe_dict["OPENAI_API_KEY"]:
+        safe_dict["OPENAI_API_KEY"] = "****"
+    logger.debug("Loaded settings: %s", safe_dict)
+    
+    return settings_instance
 
-# Hide sensitive info in logs
-safe_dict = settings.dict()
-if "OPENAI_API_KEY" in safe_dict:
-    safe_dict["OPENAI_API_KEY"] = "****"
-logger.debug("Loaded settings: %s", safe_dict) 
+
+# Instantiate a global settings object for convenient import
+# This is kept for backwards compatibility
+settings = get_settings() 

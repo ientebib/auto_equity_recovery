@@ -4,26 +4,12 @@ Utility helper functions shared across modules of the lead recovery project.
 from __future__ import annotations
 
 import logging
-import re
 from pathlib import Path
+from typing import Any, Dict
+
+from .config import settings
 
 logger = logging.getLogger(__name__)
-
-
-def clean_phone(raw: str | None) -> str | None:
-    """Return the last 10 numeric digits of *raw* phone string, or None if invalid.
-
-    Strips every non-digit character, checks if at least 10 digits remain,
-    and returns the last 10. Returns None if the input is None or if fewer
-    than 10 digits are found after cleaning.
-    """
-    if raw is None:
-        return None
-    digits = re.sub(r"\D", "", raw)
-    if len(digits) < 10:
-        logger.debug("Invalid phone number (too short): %s -> %s", raw, digits)
-        return None
-    return digits[-10:]
 
 
 def clean_email(raw: str | None) -> str:
@@ -38,20 +24,16 @@ def clean_email(raw: str | None) -> str:
     return f"{local.lower()}@{domain.lower()}" if domain else raw.lower()
 
 
-def load_sql_file(path: Path) -> str:  # noqa: D401
-    """Read *path* and return SQL text; raise if file missing/empty.
+def load_sql_file(file_path: Path | str) -> str:
+    """Read SQL content from a file."""
+    if not file_path.is_file():
+        logger.error("SQL file not found: %s", file_path)
+        raise FileNotFoundError(f"SQL file not found: {file_path}")
 
-    This is used by the DB query modules to externalise SQL. Mimics runtime
-    behaviour of the earlier pipeline but is now fully testable.
-    """
-    if not path.is_file():
-        logger.error("SQL file not found: %s", path)
-        raise FileNotFoundError(f"SQL file not found: {path}")
-
-    sql = path.read_text(encoding="utf-8").strip()
+    sql = file_path.read_text(encoding="utf-8").strip()
     if not sql:
-        logger.error("SQL file at %s is empty", path)
-        raise FileNotFoundError(f"SQL file at {path} is empty.")
+        logger.error("SQL file at %s is empty", file_path)
+        raise FileNotFoundError(f"SQL file at {file_path} is empty.")
 
-    logger.debug("Loaded SQL file '%s' (%d chars)", path, len(sql))
+    logger.debug("Loaded SQL file '%s' (%d chars)", file_path, len(sql))
     return sql 

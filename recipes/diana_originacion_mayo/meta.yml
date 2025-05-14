@@ -1,0 +1,50 @@
+---
+name: diana_originacion_mayo
+description: Analyzes conversations to detect when users receive a specific offer template message and how they respond to it.
+version: "1.0"
+author: "Diana"
+data_source: bigquery
+data_fields:
+  - cleaned_phone
+  - offer_detected
+  - user_response
+  - handoff_reached
+  - handoff_response
+  - handoff_finalized
+  - handoff_stall_reason
+
+summary_fields:
+  - total_phones
+  - offers_sent
+  - interested_count
+  - not_interested_count
+  - ignored_count
+  - handoff_reached_count
+  - handoff_started_count
+  - handoff_declined_count
+  - handoff_ignored_count
+  - handoff_completed_count
+
+# Define which columns appear in the output
+output_columns:
+  - cleaned_phone
+  - offer_detected
+  - user_response
+  - handoff_reached
+  - handoff_response
+  - handoff_finalized
+  - handoff_stall_reason
+  
+# If using the prompt for LLM analysis, expect these keys
+expected_yaml_keys:
+  - handoff_progress
+  - stall_reason
+  - suggested_followup
+
+doc: >
+  This recipe analyzes WhatsApp conversations to identify when users receive a specific loan offer 
+  template message and whether they click "Me interesa", "de momento no", or ignore the message.
+  It also tracks whether users reach and progress through the handoff process.
+  
+  The input is a list of phone numbers in leads.csv, and the output is a csv with the analysis results
+  plus a summary text file with statistics. 

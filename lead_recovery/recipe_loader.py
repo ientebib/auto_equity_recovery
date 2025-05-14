@@ -37,6 +37,9 @@ from pathlib import Path
 from typing import Dict, List, Any, Optional
 import yaml
 
+# Import custom exception
+from .exceptions import ConfigurationError, RecipeNotFoundError
+
 # --------------------------------------------------------------------------- #
 # Constants
 # --------------------------------------------------------------------------- #
@@ -92,18 +95,21 @@ def load_recipe(name: str) -> Recipe:
     """
     dir_path = RECIPE_ROOT / name
     if not dir_path.exists():
-        raise FileNotFoundError(f"Recipe '{name}' does not exist under '{RECIPE_ROOT}'.")
+        # Raise specific RecipeNotFoundError
+        raise RecipeNotFoundError(f"Recipe '{name}' does not exist under '{RECIPE_ROOT}'.")
 
     meta_path = dir_path / "meta.yml"
     if not meta_path.exists():
-        raise FileNotFoundError(f"meta.yml not found for recipe '{name}'.")
+        # Raise specific RecipeNotFoundError (as meta.yml is essential)
+        raise RecipeNotFoundError(f"meta.yml not found for recipe '{name}'.")
 
     # Load YAML meta FIRST so we can read custom filenames
     try:
         with open(meta_path, "r", encoding="utf-8") as f:
             meta_dict: Dict[str, Any] = yaml.safe_load(f) or {}
     except yaml.YAMLError as exc:  # pragma: no cover – edge‑case
-        raise ValueError(f"Invalid YAML in {meta_path}: {exc}") from exc
+        # Raise ConfigurationError for bad YAML
+        raise ConfigurationError(f"Invalid YAML in {meta_path}: {exc}") from exc
 
     # Validate basic required fields
     required_fields = [
@@ -116,7 +122,8 @@ def load_recipe(name: str) -> Recipe:
     ]
     for field in required_fields:
         if field not in meta_dict:
-            raise ValueError(f"Missing required field '{field}' in {meta_path}")
+            # Raise ConfigurationError for missing fields
+            raise ConfigurationError(f"Missing required field '{field}' in {meta_path}")
 
     # Resolve filenames from meta (fallback to defaults) ------------------ #
     redshift_fn = meta_dict.get("redshift_sql", "redshift.sql")
@@ -141,7 +148,8 @@ def load_recipe(name: str) -> Recipe:
     # Added: Load expected YAML keys if provided
     expected_yaml_keys = meta_dict.get("expected_yaml_keys", None)
     if expected_yaml_keys is not None and not isinstance(expected_yaml_keys, list):
-        raise ValueError(f"'expected_yaml_keys' in {meta_path} must be a list, if provided.")
+        # Raise ConfigurationError for incorrect type
+        raise ConfigurationError(f"'expected_yaml_keys' in {meta_path} must be a list, if provided.")
 
     return Recipe(
         name=name,

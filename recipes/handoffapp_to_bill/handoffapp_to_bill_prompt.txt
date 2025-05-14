@@ -65,3 +65,7 @@ contact_priority: "<CÓDIGO: HIGH, MEDIUM, LOW - según probabilidad de recupera
 === Historial de Conversación ===
 {conversation_text}
 === Fin Historial ===
+
+# --- Runtime Context ---
+# Current CDMX Time: {HOY_ES}
+# Last Conversation Message Time: {LAST_QUERY_TIMESTAMP}

@@ -1,0 +1,88 @@
+
+  You can now view your Streamlit app in your browser.
+
+  URL: http://0.0.0.0:8501
+
+  For better performance, install the Watchdog module:
+
+  $ xcode-select --install
+  $ pip install watchdog
+            
+[31m──[0m[31m────────────────────────[0m[31m [0m[1;31mTraceback [0m[1;2;31m(most recent call last)[0m[31m [0m[31m─────────────────────────[0m[31m──[0m
+[31m [0m [2m/Users/isaacentebi/Desktop/lead_recovery_project/fresh_env/lib/python3.12/site-packa[0m [31m [0m
+[31m [0m [2mges/streamlit/runtime/scriptrunner/[0m[1mexec_code.py[0m:121 in exec_func_with_error_handling [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/Users/isaacentebi/Desktop/lead_recovery_project/fresh_env/lib/python3.12/site-packa[0m [31m [0m
+[31m [0m [2mges/streamlit/runtime/scriptrunner/[0m[1mscript_runner.py[0m:648 in code_to_exec              [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/Users/isaacentebi/Desktop/lead_recovery_project/dashboard/[0m[1mapp.py[0m:1197 in <module>   [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m   [2m1194 [0m[2m│   │   │   │   │   │   [0mst.rerun()                                            [31m [0m
+[31m [0m   [2m1195 [0m                                                                              [31m [0m
+[31m [0m   [2m1196 [0m[94mif[0m [91m__name__[0m == [33m"[0m[33m__main__[0m[33m"[0m:                                                    [31m [0m
+[31m [0m [31m❱ [0m1197 [2m│   [0m[1;4mmain()[0m                                                                    [31m [0m
+[31m [0m   [2m1198 [0m                                                                              [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/Users/isaacentebi/Desktop/lead_recovery_project/dashboard/[0m[1mapp.py[0m:1153 in main       [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m   [2m1150 [0m[2m│   │   [0mmain_col, _ = st.columns([[94m3[0m, [94m1[0m])                                      [31m [0m
+[31m [0m   [2m1151 [0m[2m│   │   [0m[94mwith[0m main_col:                                                        [31m [0m
+[31m [0m   [2m1152 [0m[2m│   │   │   [0mrender_recipe_explorer(recipe)                                    [31m [0m
+[31m [0m [31m❱ [0m1153 [2m│   │   │   [0m[1;4mrender_log_output()[0m                                               [31m [0m
+[31m [0m   [2m1154 [0m[2m│   │   [0m                                                                      [31m [0m
+[31m [0m   [2m1155 [0m[2m│   │   [0mrender_execution_controls(recipe)                                     [31m [0m
+[31m [0m   [2m1156 [0m[2m│   [0m[94melse[0m:                                                                     [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/Users/isaacentebi/Desktop/lead_recovery_project/dashboard/[0m[1mapp.py[0m:1004 in            [31m [0m
+[31m [0m render_log_output                                                                    [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m   [2m1001 [0m[2m│   │   │   │   │   │   [0mremaining_time = process.info.get_estimated_remaining [31m [0m
+[31m [0m   [2m1002 [0m[2m│   │   │   │   │   │   [0m                                                      [31m [0m
+[31m [0m   [2m1003 [0m[2m│   │   │   │   │   │   [0m[2m# Show progress bar[0m                                   [31m [0m
+[31m [0m [31m❱ [0m1004 [2m│   │   │   │   │   │   [0mprogress_bar = [1;4mst.progress(progress, key=[0m[1;4;33m"[0m[1;4;33mprogress_ba[0m [31m [0m
+[31m [0m   [2m1005 [0m[2m│   │   │   │   │   │   [0m                                                      [31m [0m
+[31m [0m   [2m1006 [0m[2m│   │   │   │   │   │   [0m[2m# Show time information[0m                               [31m [0m
+[31m [0m   [2m1007 [0m[2m│   │   │   │   │   │   [0mst.caption([33mf[0m[33m"[0m[33m⏱️ Elapsed: [0m[33m{[0mformat_time(elapsed_time)[33m}[0m[33m |[0m [31m [0m
+[31m────────────────────────────────────────────────────────────────────────────────────────[0m
+[1;91mTypeError: [0m[1;35mProgressMixin.progress[0m[1m([0m[1m)[0m got an unexpected keyword argument [32m'key'[0m
+[31m──[0m[31m────────────────────────[0m[31m [0m[1;31mTraceback [0m[1;2;31m(most recent call last)[0m[31m [0m[31m─────────────────────────[0m[31m──[0m
+[31m [0m [2m/Users/isaacentebi/Desktop/lead_recovery_project/fresh_env/lib/python3.12/site-packa[0m [31m [0m
+[31m [0m [2mges/streamlit/runtime/scriptrunner/[0m[1mexec_code.py[0m:121 in exec_func_with_error_handling [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/Users/isaacentebi/Desktop/lead_recovery_project/fresh_env/lib/python3.12/site-packa[0m [31m [0m
+[31m [0m [2mges/streamlit/runtime/scriptrunner/[0m[1mscript_runner.py[0m:648 in code_to_exec              [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/Users/isaacentebi/Desktop/lead_recovery_project/dashboard/[0m[1mapp.py[0m:1197 in <module>   [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m   [2m1194 [0m[2m│   │   │   │   │   │   [0mst.rerun()                                            [31m [0m
+[31m [0m   [2m1195 [0m                                                                              [31m [0m
+[31m [0m   [2m1196 [0m[94mif[0m [91m__name__[0m == [33m"[0m[33m__main__[0m[33m"[0m:                                                    [31m [0m
+[31m [0m [31m❱ [0m1197 [2m│   [0m[1;4mmain()[0m                                                                    [31m [0m
+[31m [0m   [2m1198 [0m                                                                              [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/Users/isaacentebi/Desktop/lead_recovery_project/dashboard/[0m[1mapp.py[0m:1153 in main       [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m   [2m1150 [0m[2m│   │   [0mmain_col, _ = st.columns([[94m3[0m, [94m1[0m])                                      [31m [0m
+[31m [0m   [2m1151 [0m[2m│   │   [0m[94mwith[0m main_col:                                                        [31m [0m
+[31m [0m   [2m1152 [0m[2m│   │   │   [0mrender_recipe_explorer(recipe)                                    [31m [0m
+[31m [0m [31m❱ [0m1153 [2m│   │   │   [0m[1;4mrender_log_output()[0m                                               [31m [0m
+[31m [0m   [2m1154 [0m[2m│   │   [0m                                                                      [31m [0m
+[31m [0m   [2m1155 [0m[2m│   │   [0mrender_execution_controls(recipe)                                     [31m [0m
+[31m [0m   [2m1156 [0m[2m│   [0m[94melse[0m:                                                                     [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/Users/isaacentebi/Desktop/lead_recovery_project/dashboard/[0m[1mapp.py[0m:1059 in            [31m [0m
+[31m [0m render_log_output                                                                    [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m   [2m1056 [0m[2m│   │   │   │   [0m                                                              [31m [0m
+[31m [0m   [2m1057 [0m[2m│   │   │   │   [0m[94mfor[0m idx, phase [95min[0m [96menumerate[0m(phases):                          [31m [0m
+[31m [0m   [2m1058 [0m[2m│   │   │   │   │   [0m[94mif[0m phase[[33m"[0m[33mcomplete[0m[33m"[0m]:                                     [31m [0m
+[31m [0m [31m❱ [0m1059 [2m│   │   │   │   │   │   [0m[1;4mst.markdown([0m[1;4;33mf[0m[1;4;33m"[0m[1;4;33m✅ **[0m[1;4;33m{[0m[1;4mphase[[0m[1;4;33m'[0m[1;4;33mname[0m[1;4;33m'[0m[1;4m][0m[1;4;33m}[0m[1;4;33m**: Completed[0m[1;4;33m"[0m[1;4m, key[0m [31m [0m
+[31m [0m   [2m1060 [0m[2m│   │   │   │   │   [0m[94melif[0m phase[[33m"[0m[33mactive[0m[33m"[0m]:                                     [31m [0m
+[31m [0m   [2m1061 [0m[2m│   │   │   │   │   │   [0mst.markdown([33mf[0m[33m"[0m[33m⏳ **[0m[33m{[0mphase[[33m'[0m[33mname[0m[33m'[0m][33m}[0m[33m**: In progress...[0m[33m"[0m [31m [0m
+[31m [0m   [2m1062 [0m[2m│   │   │   │   │   [0m[94melse[0m:                                                     [31m [0m
+[31m [0m                                                                                      [31m [0m
+[31m [0m [2m/Users/isaacentebi/Desktop/lead_recovery_project/fresh_env/lib/python3.12/site-packa[0m [31m [0m
+[31m [0m [2mges/streamlit/runtime/[0m[1mmetrics_util.py[0m:444 in wrapped_func                            [31m [0m
+[31m────────────────────────────────────────────────────────────────────────────────────────[0m
+[1;91mTypeError: [0m[1;35mMarkdownMixin.markdown[0m[1m([0m[1m)[0m got an unexpected keyword argument [32m'key'[0m
+  Stopping...

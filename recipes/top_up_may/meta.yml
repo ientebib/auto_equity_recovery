@@ -1,0 +1,48 @@
+# Basic metadata for the top_up_may recipe
+name: "top_up_may"
+description: "Recipe for analyzing lead engagement in the active Top Up May campaign, using leads.csv as input."
+dashboard_title: "Top Up May Campaign Analysis (CSV Input)"
+summary_format: yaml
+
+# Define input CSV file relative to the recipe directory
+input_csv_file: output_run/leads.csv
+
+# Explicitly define SQL filenames (even if default)
+redshift_sql: redshift.sql # Required, but skipped via CLI flag
+bigquery_sql: bigquery.sql
+prompt_file: prompt.txt
+
+# Define the keys expected from the OpenAI prompt's YAML output
+# Derived from the updated prompt.txt for engagement analysis.
+expected_yaml_keys:
+  - lead_name
+  - summary                 # Estado + acción
+  - current_engagement_status
+  - follow_up_attempts
+  # Following fields are now provided by Python, not from LLM output
+  # - last_message_sender
+  # - last_user_message_text
+  # - last_kuna_message_text
+  - timing_reasoning
+  - next_action_code
+  - next_action_context
+  - suggested_message_es
+  - transfer_context_analysis
+
+# Define the columns to include in the final output report
+# Assumes 'cleaned_phone' is a column in leads.csv
+output_columns:
+  - cleaned_phone
+  - lead_name
+  - cache_status
+  - summary
+  - current_engagement_status
+  - follow_up_attempts
+  - last_message_sender
+  - last_user_message_text
+  - last_kuna_message_text
+  - timing_reasoning
+  - next_action_code
+  - next_action_context
+  - suggested_message_es
+  - transfer_context_analysis 

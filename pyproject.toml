@@ -14,7 +14,7 @@ ignore = ["D100", "D104", "D107", "D203", "D212", "D415"]
 quote-style = "double"
 
 [tool.setuptools]
-packages = ["lead_recovery"]
+packages = ["lead_recovery", "dashboard"]
 
 [tool.setuptools.package-data]
 lead_recovery = ["prompts/openai_prompt.txt", "sql/*.sql"]
@@ -45,6 +45,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest", 
+    "pytest-cov",
     "black", 
     "isort", 
     "ruff", 
@@ -53,4 +54,4 @@ dev = [
 ]
 
 [project.scripts]
-lead-recovery = "lead_recovery.cli:main" 
+lead-recovery = "lead_recovery.cli.main:main" 

@@ -16,6 +16,7 @@ output_columns:
   - next_action_code
   - next_action_context
   - suggested_message_es
+  - CONTACT
 dashboard_title: "Profiling‑Incomplete Recovery"
 summary_format: YAML
 redshift_sql: redshift_profiling_incomplete.sql
@@ -26,9 +27,9 @@ expected_yaml_keys:
   - inferred_stall_stage
   - primary_stall_reason_code
   - prior_recovery_attempt_count
-  - last_message_sender
-  - last_user_message_text
-  - last_kuna_message_text
+  # - last_message_sender # Python-generated, should not be expected from LLM
+  # - last_user_message_text # Python-generated, should not be expected from LLM
+  # - last_kuna_message_text # Python-generated, should not be expected from LLM
   - stall_summary
   - next_action_code
   - next_action_context

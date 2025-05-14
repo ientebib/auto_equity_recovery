@@ -1,53 +1,133 @@
-# ========================================================================
-# META CONFIGURATION FOR RECIPE: simulation_to_handoff_v12
-# ========================================================================
-
-# --- Basic Recipe Identification ---
-name: "simulation_to_handoff_v12"
-dashboard_title: "Recuperación Simulación-Hand-Off v12 (Context Rich)" # Updated title
-
-# --- Data Source Configuration ---
+name: simulation_to_handoff_v17
+dashboard_title: "Recuperaci\xF3n Simulaci\xF3n-Hand-Off v17 (Time Aware)"
 redshift_sql: simulation_to_handoff_redshift.sql
 bigquery_sql: simulation_to_handoff_bigquery.sql
-
-# --- LLM Analysis Configuration ---
-prompt_file: simulation_to_handoff_prompt_v12.txt # Updated prompt file reference
+prompt_file: simulation_to_handoff_prompt_v12.txt
 summary_format: YAML
-
-# --- Output Structure Definition ---
-# Defines the columns and their order in the final output CSV/DataFrame
+google_sheets:
+  sheet_id: 1466ljSang2OBqqgn6XWGVXUS2JQ7VPcbEJ6eYYG-WO8
+  worksheet_name: perfAp-handoff
 output_columns:
-  # Core lead info (adjust if needed)
-  - folio_id
-  - nombre
-  - telefono
-  - monto_preaprobado
-  - profiling_approval_date
-
-  # LLM Analysis Output (MUST match the order in the prompt's final YAML block)
-  - analysis_summary
-  - inferred_stall_stage
-  - primary_stall_reason_code
-  - prior_recovery_attempt_count
-  - last_user_message_text
-  - last_kuna_message_text
-  - stall_summary
-  - next_action_code
-  - next_action_context
-  - suggested_message_es
-
-# --- LLM Output Validation ---
-# List of keys the Python script expects to find in the LLM's YAML output.
-# MUST match the keys the prompt is instructed to generate.
+- lead_id
+- user_id
+- lead_created_at
+- name
+- last_name
+- cleaned_phone
+- summary
+- inferred_stall_stage
+- primary_stall_reason_code
+- prior_reactivation_attempt_count
+- reactivation_status_assessment
+- last_message_sender
+- last_user_message_text
+- last_kuna_message_text
+- last_message_ts
+- transfer_context_analysis
+- next_action_code
+- next_action_context
+- suggested_message_es
+- cache_status
+- human_transfer
+- last_bot_message_is_recovery_template
+- consecutive_recovery_templates_count
+- handoff_finalized
+- handoff_invitation_detected
+- handoff_response
+- recovery_template_detected
+- HOURS_MINUTES_SINCE_LAST_USER_MESSAGE
+- HOURS_MINUTES_SINCE_LAST_MESSAGE
+- IS_WITHIN_REACTIVATION_WINDOW
+- IS_RECOVERY_PHASE_ELIGIBLE
+- LAST_USER_MESSAGE_TIMESTAMP_TZ
+- LAST_MESSAGE_TIMESTAMP_TZ
+- NO_USER_MESSAGES_EXIST
+- pre_validacion_detected
+- conversation_state
+- thought_process
 expected_yaml_keys:
-  - analysis_summary
-  - inferred_stall_stage
-  - primary_stall_reason_code
-  - prior_recovery_attempt_count
-  - last_message_sender
-  - last_user_message_text
-  - last_kuna_message_text
-  - stall_summary
-  - next_action_code
-  - next_action_context
-  - suggested_message_es
+- summary
+- inferred_stall_stage
+- primary_stall_reason_code
+- prior_reactivation_attempt_count
+- reactivation_status_assessment
+- transfer_context_analysis
+- next_action_code
+- next_action_context
+- suggested_message_es
+- thought_process
+validation_enums:
+  inferred_stall_stage:
+  - PRE_VALIDACION_PY
+  - POST_VALIDACION_PY
+  - HANDOFF_INVITACION_PENDIENTE_RESPUESTA
+  - HANDOFF_DECLINADO_POR_USUARIO
+  - HANDOFF_PROCESO_INICIADO_POR_USUARIO
+  - HANDOFF_COMPLETADO
+  - HANDOFF_ESTADO_DESCONOCIDO_PY
+  primary_stall_reason_code:
+  - FINANCIAMIENTO_ACTIVO
+  - VEHICULO_ANTIGUO_KM
+  - NO_PROPIETARIO
+  - VIN_EXTRANJERO
+  - ZONA_NO_CUBIERTA
+  - ADEUDO_VEHICULAR_MULTAS
+  - PROBLEMA_SEGUNDA_LLAVE
+  - PROBLEMA_TERMINOS
+  - GHOSTING
+  - ERROR_PROCESO_INTERNO
+  - RECHAZADO_POR_KUNA
+  - PRODUCTO_INCORRECTO_COMPRADOR
+  - DESINTERES_EXPLICITO
+  - AMBIGUO
+  - OTRO_PROCESO_DE_NEGOCIO
+  - PROCESO_EN_CURSO
+  - PROCESO_EN_CURSO_USUARIO_OCUPADO
+  - NUNCA_RESPONDIO
+  - N/A
+  reactivation_status_assessment:
+  - NO_APLICA_AUN
+  - PENDIENTE_PRIMERA_REACTIVACION
+  - REACTIVACION_EN_CURSO_INTENTO_1_ENVIADO
+  - REACTIVACION_EN_CURSO_INTENTO_2_ENVIADO
+  - REACTIVACION_TARDIA_NECESITA_INTENTO_1
+  - REACTIVACION_TARDIA_NECESITA_INTENTO_2
+  - REACTIVACION_TARDIA_NECESITA_INTENTO_3
+  - REACTIVACION_COMPLETA_3_INTENTOS_SIN_RESPUESTA
+  - NO_APLICA_POR_CIERRE_O_ESPERA
+  - NO_APLICA_FASE_RECUPERACION
+  next_action_code:
+  - CERRAR
+  - ESPERAR
+  - ESPERAR_CONTACTO_PROGRAMADO
+  - IGNORAR
+  - RECONTACTAR_INMEDIATO
+  - ENVIAR_REACTIVACION
+  - ESPERAR_FIN_REACTIVACION
+  - ESPERAR_TEMPLATE_RECUPERACION
+  - MANEJAR_OBJECION
+  - LLAMAR_LEAD_NUNCA_RESPONDIO
+python_flag_columns:
+- recovery_template_detected
+- last_kuna_message_text
+- handoff_finalized
+- last_message_ts
+- handoff_response
+- IS_WITHIN_REACTIVATION_WINDOW
+- consecutive_recovery_templates_count
+- NO_USER_MESSAGES_EXIST
+- HOURS_MINUTES_SINCE_LAST_MESSAGE
+- last_user_message_text
+- last_message_sender
+- LAST_USER_MESSAGE_TIMESTAMP_TZ
+- handoff_invitation_detected
+- human_transfer
+- IS_RECOVERY_PHASE_ELIGIBLE
+- LAST_MESSAGE_TIMESTAMP_TZ
+- HOURS_MINUTES_SINCE_LAST_USER_MESSAGE
+- pre_validacion_detected
+- conversation_state
+
+# Columns to explicitly exclude from the output
+exclude_columns:
+- conversation_digest

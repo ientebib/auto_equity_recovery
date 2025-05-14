@@ -1,0 +1,66 @@
+---
+name: "marzo_cohorts"
+description: "Analyzes marzo cohorts of leads to understand why they stalled."
+version: "1.0"
+author: "Isaac"
+created_date: "2025-05-09"
+
+# --- LLM Analysis Configuration ---
+prompt_file: prompt.txt
+summary_format: YAML
+
+# --- LLM Output Validation ---
+# Keys the Python script expects from the LLM's YAML output.
+expected_yaml_keys:
+  - primary_stall_reason_code
+  - summary_what_went_wrong
+
+# --- Output Structure Definition ---
+# Defines all columns that should be in the final output CSV.
+# This should match your input leads.csv structure, with new fields added.
+output_columns:
+  - cleaned_phone
+  - Email
+  - Asset ID
+  - Last Bureua Score
+  - Max Loan
+  - Nombre
+  - Cohort
+  - Control Group
+  - Initial Step
+  - Initial Step Date
+  - Last Step
+  - Last Step Date
+  - Bill Date
+  # Columns to be populated by this recipe's analysis
+  - primary_stall_reason_code
+  - last_message_sender
+  - last_user_message_text
+  - last_kuna_message_text
+  - summary_what_went_wrong
+  - handoff_finalized
+  
+# --- LLM Output Enum Validation ---
+# For primary_stall_reason_code, using the exact list provided by the user.
+validation_enums:
+  primary_stall_reason_code:
+    - "VEHICULO_ANTIGUO_KM"
+    - "NO_PROPIETARIO"
+    - "VIN_EXTRANJERO"
+    - "ZONA_NO_CUBIERTA"
+    - "ADEUDO_VEHICULAR"
+    - "PROBLEMA_SEGUNDA_LLAVE"
+    - "PROBLEMA_TERMINOS"
+    - "GHOSTING"
+    - "ERROR_PROCESO_INTERNO"
+    - "RECHAZADO_POR_KUNA"
+    - "PRODUCTO_INCORRECTO_COMPRADOR"
+    - "OTHER_BUSINESS_PROCESS"
+    - "FINANCIAMIENTO_ACTIVO"
+    - "ADEUDO_VEHICULAR_MULTAS"
+    - "OTRO_PROCESO_DE_NEGOCIO"
+
+# Optional: Google Sheets integration 
+# google_sheets:
+#   sheet_id: "your-sheet-id-here"
+#   worksheet_name: "your-worksheet-name"

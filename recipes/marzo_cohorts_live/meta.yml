@@ -1,0 +1,175 @@
+---
+name: "marzo_cohorts_live_v2"
+description: "Analyzes marzo cohorts post-recovery attempt (May 8th onwards) for stall reason, recovery outcome, and next actions, using advanced Python flags."
+version: "2.0"
+author: "Isaac"
+created_date: "2025-05-09"
+
+# --- LLM Analysis Configuration ---
+prompt_file: prompt.txt
+summary_format: YAML
+
+# --- Behavior Flags ---
+behavior_flags:
+  skip_detailed_temporal_processing: false
+
+# --- Python Flags Configuration (explicitly enable flags) ---
+python_flags:
+  skip_temporal_flags: false
+  skip_metadata_extraction: false
+  skip_handoff_detection: false
+  skip_human_transfer: false
+  skip_recovery_template_detection: false
+  skip_consecutive_templates_count: false
+  skip_pre_validacion_detection: false
+  skip_conversation_state: false
+  # Granular temporal flags (ensure these are false if skip_temporal_flags is false)
+  skip_detailed_temporal: false
+  skip_hours_minutes: false
+  skip_reactivation_flags: false
+  skip_timestamps: false
+  skip_user_message_flag: false
+  # Granular handoff flags (ensure these are false if skip_handoff_detection is false)
+  skip_handoff_invitation: false
+  skip_handoff_started: false
+  skip_handoff_finalized: false
+
+# --- LLM Output Validation ---
+expected_yaml_keys:
+  - summary
+  - inferred_stall_stage
+  - primary_stall_reason_code
+  - prior_reactivation_attempt_count
+  - reactivation_status_assessment
+  - transfer_context_analysis
+  - next_action_code
+  - next_action_context
+  - suggested_message_es
+  - thought_process
+  - summary_what_went_wrong
+
+# --- Output Structure Definition ---
+output_columns:
+  - cleaned_phone
+  - Email
+  - Asset ID
+  - Last Bureua Score
+  - Max Loan
+  - Nombre
+  - Cohort
+  - Control Group
+  - Initial Step
+  - Initial Step Date
+  - Last Step
+  - Last Step Date
+  - Bill Date
+  # Columns from this recipe's Python analyzer (get_marzo_live_python_flags)
+  - handoff_reached
+  # LLM Analysis Columns (from expected_yaml_keys)
+  - summary
+  - inferred_stall_stage
+  - primary_stall_reason_code
+  - prior_reactivation_attempt_count
+  - reactivation_status_assessment
+  - transfer_context_analysis
+  - next_action_code
+  - next_action_context
+  - suggested_message_es
+  - thought_process
+  - summary_what_went_wrong
+  # Python Flag Columns (dynamically included based on skip_ flags)
+  - CONVERSATION_STATE_PY
+  - PRE_VALIDACION_DETECTED
+  - HANDOFF_INVITATION_DETECTED
+  - HANDOFF_RESPONSE
+  - HANDOFF_FINALIZED
+  - LAST_USER_MESSAGE_TIMESTAMP_TZ
+  - LAST_MESSAGE_TIMESTAMP_TZ
+  - HOURS_MINUTES_SINCE_LAST_USER_MESSAGE
+  - HOURS_MINUTES_SINCE_LAST_MESSAGE
+  - NO_USER_MESSAGES_EXIST
+  - HUMAN_TRANSFER_DETECTED_BY_PYTHON
+  - LAST_MESSAGE_SENDER
+  - LAST_USER_MESSAGE
+  - LAST_KUNA_MESSAGE
+  - RECOVERY_TEMPLATE_DETECTED
+  - consecutive_recovery_templates_count
+  - IS_WITHIN_REACTIVATION_WINDOW
+  - IS_RECOVERY_PHASE_ELIGIBLE
+  # Utility Columns
+  - cleaned_phone
+  - Email
+  - Asset ID
+  - Last Bureua Score
+  - Max Loan
+  - Nombre
+  - Cohort
+  - Control Group
+  - Initial Step
+  - Initial Step Date
+  - Last Step
+  - Last Step Date
+  - Bill Date
+
+# --- LLM Output Enum Validation ---
+validation_enums:
+  primary_stall_reason_code:
+    - "GHOSTING_POST_RECUPERACION"
+    - "AVANCES_EN_PROCESO"
+    - "NO_INTERESADO_EXPLICITAMENTE"
+    - "SOLICITO_NO_CONTACTAR"
+    - "VEHICULO_ANTIGUO_KM"
+    - "NO_PROPIETARIO"
+    - "VIN_EXTRANJERO"
+    - "ZONA_NO_CUBIERTA"
+    - "ADEUDO_VEHICULAR"
+    - "PROBLEMA_SEGUNDA_LLAVE"
+    - "PROBLEMA_TERMINOS"
+    - "ERROR_PROCESO_INTERNO"
+    - "RECHAZADO_POR_KUNA"
+    - "PRODUCTO_INCORRECTO_COMPRADOR"
+    - "FINANCIAMIENTO_ACTIVO"
+    - "ADEUDO_VEHICULAR_MULTAS"
+    - "OTRO_PROCESO_DE_NEGOCIO"
+    - "N/A"
+    - "OTRO"
+  inferred_stall_stage:
+    - "PRE_VALIDACION_PY"
+    - "POST_VALIDACION_PY"
+    - "HANDOFF_INVITACION_PENDIENTE_RESPUESTA"
+    - "HANDOFF_DECLINADO_POR_USUARIO"
+    - "HANDOFF_PROCESO_INICIADO_POR_USUARIO"
+    - "HANDOFF_COMPLETADO"
+    - "HANDOFF_ESTADO_DESCONOCIDO_PY"
+  reactivation_status_assessment:
+    - "NO_APLICA_AUN"
+    - "PENDIENTE_PRIMERA_REACTIVACION"
+    - "REACTIVACION_EN_CURSO_INTENTO_1_ENVIADO"
+    - "REACTIVACION_EN_CURSO_INTENTO_2_ENVIADO"
+    - "REACTIVACION_TARDIA_NECESITA_INTENTO_1"
+    - "REACTIVACION_TARDIA_NECESITA_INTENTO_2"
+    - "REACTIVACION_TARDIA_NECESITA_INTENTO_3"
+    - "REACTIVACION_COMPLETA_3_INTENTOS_SIN_RESPUESTA"
+    - "NO_APLICA_POR_CIERRE_O_ESPERA"
+    - "NO_APLICA_FASE_RECUPERACION"
+  next_action_code:
+    - "CERRAR"
+    - "ESPERAR"
+    - "ESPERAR_CONTACTO_PROGRAMADO"
+    - "IGNORAR"
+    - "RECONTACTAR_INMEDIATO"
+    - "ENVIAR_REACTIVACION"
+    - "ESPERAR_FIN_REACTIVACION"
+    - "ESPERAR_TEMPLATE_RECUPERACION"
+    - "MANEJAR_OBJECION"
+    - "LLAMAR_LEAD_NUNCA_RESPONDIO"
+  handoff_response:
+    - "STARTED_HANDOFF"
+    - "DECLINED_HANDOFF"
+    - "IGNORED_HANDOFF"
+    - "NO_INVITATION_YET"
+
+# Optional: Google Sheets integration 
+# google_sheets:
+#   sheet_id: "your-sheet-id-here"
+#   worksheet_name: "your-worksheet-name"

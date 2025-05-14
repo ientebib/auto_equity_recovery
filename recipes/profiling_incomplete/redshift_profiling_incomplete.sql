@@ -62,4 +62,5 @@ WHERE
   AND ll.simulation_id IS NULL
   AND ll.handoff_status IS NULL
   AND ll.transaction_id IS NULL
-  limit 2000; 
+  limit 50;
+  

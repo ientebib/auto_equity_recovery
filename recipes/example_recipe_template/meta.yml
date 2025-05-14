@@ -1,0 +1,91 @@
+---
+# Basic recipe identification
+name: "example_recipe_template"
+description: "Example recipe template showing the new Python flags configuration"
+dashboard_title: "Example Recipe Template with Dynamic Python Flags"
+version: "1.0"
+author: "Lead Recovery Team"
+
+# Data source configuration
+redshift_sql: redshift.sql
+bigquery_sql: bigquery.sql
+
+# LLM configuration
+prompt_file: prompt.txt
+summary_format: YAML
+
+# Python Flags Configuration
+# Control which Python flag functions are enabled or disabled
+python_flags:
+  # Temporal flags
+  skip_temporal_flags: false
+  skip_detailed_temporal: false
+  skip_hours_minutes: false
+  skip_reactivation_flags: false
+  skip_timestamps: false
+  skip_user_message_flag: false
+  
+  # Message metadata
+  skip_metadata_extraction: false
+  
+  # Handoff detection
+  skip_handoff_detection: false
+  skip_handoff_invitation: false
+  skip_handoff_started: false
+  skip_handoff_finalized: false
+  
+  # Other detections
+  skip_human_transfer: false
+  skip_recovery_template_detection: false
+  skip_topup_template_detection: true  # Skip top-up template detection for this recipe
+  skip_consecutive_templates_count: false
+
+# Expected output from LLM (do not include Python-generated fields here)
+expected_yaml_keys:
+  - summary
+  - primary_stall_reason_code
+  - inferred_stall_stage
+  - next_action_code
+  - next_action_context
+  - suggested_message_es
+  - transfer_context_analysis
+
+# Final output columns order (both LLM and Python flags)
+output_columns:
+  # Core lead info
+  - cleaned_phone
+  - name
+  - email
+  - created_at
+  
+  # LLM-generated columns
+  - summary
+  - primary_stall_reason_code
+  - inferred_stall_stage
+  - next_action_code
+  - next_action_context
+  - suggested_message_es
+  - transfer_context_analysis
+  
+  # Python-generated columns (will be dynamically included/excluded)
+  # These can be listed here for explicit ordering, or they will be
+  # added automatically based on which Python flag functions are enabled
+  - last_message_sender
+  - last_user_message_text
+  - last_kuna_message_text
+  - HOURS_MINUTES_SINCE_LAST_USER_MESSAGE
+  - HOURS_MINUTES_SINCE_LAST_MESSAGE
+  - IS_WITHIN_REACTIVATION_WINDOW
+  - IS_RECOVERY_PHASE_ELIGIBLE
+  - handoff_finalized
+  - human_transfer
+  - recovery_template_detected
+  - consecutive_recovery_templates_count
+  
+  # Processing metadata
+  - cache_status
+
+# Optional: Google Sheets integration
+google_sheets:
+  sheet_id: "your-google-sheet-id"
+  worksheet_name: "your-worksheet-name" 

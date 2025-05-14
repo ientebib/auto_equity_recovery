@@ -8,14 +8,18 @@ import re
 import time
 import tempfile
 import uuid
+import csv
+import sys
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Union
 
 import pandas as pd
 import redshift_connector
 from google.cloud import bigquery
+from google.oauth2 import service_account
 
 from .config import settings
+from .exceptions import DatabaseConnectionError, DatabaseQueryError
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +30,19 @@ def _redact_pii(sql: str) -> str:
     sql = re.sub(r'\b\d{10,}\b', '[PHONE_REDACTED]', sql)
     sql = re.sub(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', '[EMAIL_REDACTED]', sql)
     return sql
+
+
+def _log_memory_usage(prefix: str = ""):
+    """Log current memory usage of the process."""
+    try:
+        import psutil
+        process = psutil.Process()
+        memory_info = process.memory_info()
+        memory_mb = memory_info.rss / 1024 / 1024
+        logger.debug(f"{prefix}Memory usage: {memory_mb:.1f} MB")
+    except ImportError:
+        # psutil not available, skip memory logging
+        pass
 
 
 class RedshiftClient:
@@ -57,30 +74,81 @@ class RedshiftClient:
             )
             logger.info("Connected to Redshift %s", settings.REDSHIFT_HOST)
             return self._conn
-        except Exception:  # noqa: BLE001
+        except Exception as e:  # Catch specific connection errors if possible, otherwise wrap
             logger.exception("Failed to connect to Redshift")
-            raise
+            # Wrap the original exception for context
+            raise DatabaseConnectionError(f"Redshift connection failed: {e}") from e
 
     # ------------------------------------------------------------------ #
     def query(self, sql: str, params: Dict[str, Any] | None = None) -> pd.DataFrame:
-        """Execute *sql* with optional *params* and return a DataFrame."""
+        """Execute *sql* with optional *params* and return a DataFrame.
+        
+        Args:
+            sql: SQL query to execute. Use %s for parameter placeholders (NOT string format!)
+            params: Dictionary of parameter values
+            
+        Returns:
+            pandas DataFrame with query results
+        """
         try:
+            # Redact sensitive data for logging
+            redacted_params = {k: '[REDACTED]' if k.lower() in ('phone', 'email', 'password') else v 
+                             for k, v in (params or {}).items()}
             logger.debug("Executing Redshift query: %s with params: %s", 
-                        _redact_pii(sql), {k: '[REDACTED]' if k.lower() in ('phone', 'email', 'password') else v 
-                                        for k, v in (params or {}).items()})
+                        _redact_pii(sql), redacted_params)
+            
             start_time = time.time()
             conn = self.connect()
+            
             with conn.cursor() as cur:
-                cur.execute(sql, params or {})
-                rows = cur.fetchall()
+                # Use proper parameterized queries instead of string formatting
+                if params:
+                    # Convert dict params to proper format expected by redshift_connector
+                    # redshift_connector expects a tuple of values, not a dict
+                    param_names = []
+                    param_values = []
+                    
+                    # Extract parameter placeholders from SQL
+                    placeholders = re.findall(r'%\((.*?)\)s', sql)
+                    
+                    # For each placeholder, add the value to param_values
+                    for name in placeholders:
+                        if name in params:
+                            param_values.append(params[name])
+                        else:
+                            raise DatabaseQueryError(f"Parameter '{name}' referenced in SQL but not provided in params dict")
+                    
+                    # Replace named parameters with positional ones
+                    sql = re.sub(r'%\((.*?)\)s', '%s', sql)
+                    
+                    # Execute with positional parameters
+                    cur.execute(sql, param_values)
+                else:
+                    cur.execute(sql)
+                
+                rows = [tuple(row) for row in cur.fetchall()] # Ensure rows are tuples
                 columns = [col[0] for col in cur.description]
+            
             duration = time.time() - start_time
+            
+            _log_memory_usage("Before DataFrame creation: ")
             df = pd.DataFrame(rows, columns=columns)
+            
+            # Optimize memory usage for string columns
+            for col in df.columns:
+                if df[col].dtype == 'object':
+                    try:
+                        df[col] = df[col].astype("string[pyarrow]")
+                    except (ImportError, TypeError):
+                        # Fall back if pyarrow not available or column has mixed types
+                        pass
+            
+            _log_memory_usage("After DataFrame optimization: ")
             logger.debug("Redshift query completed in %.2f seconds, returned %d rows", duration, len(df))
             return df
-        except Exception:  # noqa: BLE001
+        except Exception as e:
             logger.exception("Redshift query failed")
-            raise
+            raise DatabaseQueryError(f"Redshift query failed: {e}") from e
 
 
 class BigQueryClient:
@@ -95,20 +163,25 @@ class BigQueryClient:
         default google‑cloud‑bigquery behaviour.
         """
         try:
+            # --- REVERTED: Use standard project/credential loading --- #
             project = getattr(settings, "BQ_PROJECT", None)
-            self._client = bigquery.Client(project=project) if project else bigquery.Client()
+            # Use default client instantiation - relies on GOOGLE_APPLICATION_CREDENTIALS env var or ADC
+            self._client = bigquery.Client(project=project, location="US") if project else bigquery.Client(location="US")
             if project:
                 logger.debug("Initialised BigQuery client for project %s", project)
-        except Exception:  # noqa: BLE001
+            else: 
+                logger.debug("Initialised BigQuery client using default project/credentials.")
+            # --- END REVERT --- #    
+        except Exception as e:
             logger.exception("Failed to instantiate BigQuery client")
-            raise
+            raise DatabaseConnectionError(f"BigQuery client instantiation failed: {e}") from e
 
     # ------------------------------------------------------------------ #
     def query(
         self, sql: str, params: List[Any] | None = None
     ) -> pd.DataFrame:
         """Run a parameterised query and return a DataFrame, handling large results via temp files."""
-        temp_dir = None
+        
         try:
             # Log query details with PII redacted and safe attribute access
             if params:
@@ -142,33 +215,138 @@ class BigQueryClient:
 
             logger.debug("Executing BigQuery query: %s with params: %s", logged_sql, params_str)
             
+            _log_memory_usage("Before BigQuery query: ")
             start_time = time.time()
             job_config = bigquery.QueryJobConfig(query_parameters=params or [])
+            
+            # Cache the query job to avoid recomputing query plan for the same SQL
             job = self._client.query(sql, job_config=job_config)
             
-            # Use an iterator to handle potentially large results
-            # Convert directly to DataFrame (simplification)
+            # Get the schema (field names)
             results_iterator = job.result()
-            final_df = results_iterator.to_dataframe()
+            schema = [field.name for field in results_iterator.schema]
+            
+            # Stream results into chunks
+            row_count = 0
+            chunk_size = 10000
+            current_chunk = []
+            all_chunks = []  # Store all chunks to concatenate once at the end
+            
+            logger.debug("Streaming BigQuery results into chunks...")
+            
+            for row in results_iterator:
+                current_chunk.append({field: value for field, value in zip(schema, row.values())})
+                row_count += 1
+                
+                # When we reach chunk_size, append to chunks list
+                if len(current_chunk) >= chunk_size:
+                    chunk_df = pd.DataFrame(current_chunk)
+                    # Optimize memory usage for string columns
+                    for col in chunk_df.columns:
+                        if chunk_df[col].dtype == 'object':
+                            try:
+                                chunk_df[col] = chunk_df[col].astype("string[pyarrow]")
+                            except (ImportError, TypeError):
+                                # Fall back if pyarrow not available or column has mixed types
+                                pass
+                    
+                    # Add to chunks list instead of concatenating incrementally
+                    all_chunks.append(chunk_df)
+                    current_chunk = []
+                    _log_memory_usage(f"After processing {row_count} rows: ")
+                    logger.debug(f"Processed {row_count} rows from BigQuery")
+            
+            # Don't forget the last chunk if any rows remain
+            if current_chunk:
+                chunk_df = pd.DataFrame(current_chunk)
+                # Optimize memory usage for string columns
+                for col in chunk_df.columns:
+                    if chunk_df[col].dtype == 'object':
+                        try:
+                            chunk_df[col] = chunk_df[col].astype("string[pyarrow]")
+                        except (ImportError, TypeError):
+                            # Fall back if pyarrow not available or column has mixed types
+                            pass
+                
+                # Add to chunks list
+                all_chunks.append(chunk_df)
+            
+            # Concatenate all chunks once, instead of incrementally
+            if all_chunks:
+                logger.debug(f"Concatenating {len(all_chunks)} chunks into final DataFrame...")
+                final_df = pd.concat(all_chunks, ignore_index=True)
+            else:
+                # Create empty DataFrame with correct schema if no data
+                final_df = pd.DataFrame(columns=schema)
             
             duration = time.time() - start_time
+            _log_memory_usage("After BigQuery processing: ")
             logger.info(
                 "BigQuery query processing complete. Total rows: %d. Total time: %.2f seconds", 
-                len(final_df), time.time() - start_time
+                row_count, duration
             )
             return final_df
 
-        except Exception:  # noqa: BLE001
+        except Exception as e:
             logger.exception("BigQuery query failed")
-            raise
-        finally:
-            pass
-            # Clean up temporary directory and files (No longer needed)
-            # if temp_dir and temp_dir.exists():
-            #      try:
-            #          for item in temp_dir.iterdir():
-            #              item.unlink()
-            #          temp_dir.rmdir()
-            #          logger.debug("Cleaned up temporary directory: %s", temp_dir)
-            #      except Exception as e:
-            #          logger.error("Failed to clean up temporary directory %s: %s", temp_dir, e) 
+            raise DatabaseQueryError(f"BigQuery query failed: {e}") from e
+            
+    def query_to_csv(
+        self, sql: str, output_path: Path | str, params: List[Any] | None = None
+    ) -> Path:
+        """Run a query and stream results directly to a CSV file, avoiding memory issues.
+        
+        Args:
+            sql: SQL query to execute
+            output_path: Path where CSV will be saved
+            params: Optional query parameters
+            
+        Returns:
+            Path to the saved CSV file
+        """
+        output_path = Path(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        try:
+            # Log query details with redacted PII
+            logged_sql = _redact_pii(sql)
+            logger.debug("Executing BigQuery query to CSV: %s", logged_sql)
+            
+            _log_memory_usage("Before BigQuery CSV query: ")
+            start_time = time.time()
+            job_config = bigquery.QueryJobConfig(query_parameters=params or [])
+            
+            # Start the query
+            query_job = self._client.query(sql, job_config=job_config)
+            
+            # Wait for the query to complete
+            iterator = query_job.result()
+            schema = [field.name for field in iterator.schema]
+            
+            # Open CSV file for writing
+            with open(output_path, 'w', newline='', encoding='utf-8') as csv_file:
+                writer = csv.DictWriter(csv_file, fieldnames=schema)
+                writer.writeheader()
+                
+                # Stream rows to CSV
+                row_count = 0
+                for row in iterator:
+                    writer.writerow({field: value for field, value in zip(schema, row.values())})
+                    row_count += 1
+                    
+                    # Log progress occasionally
+                    if row_count % 50000 == 0:
+                        _log_memory_usage(f"After streaming {row_count} rows: ")
+                        logger.debug(f"Streamed {row_count} rows to CSV")
+            
+            duration = time.time() - start_time
+            _log_memory_usage("After BigQuery CSV processing: ")
+            logger.info(
+                "BigQuery query to CSV complete. Wrote %d rows to %s. Total time: %.2f seconds", 
+                row_count, output_path, duration
+            )
+            return output_path
+            
+        except Exception as e:
+            logger.exception(f"BigQuery query to CSV failed: {e}")
+            raise DatabaseQueryError(f"BigQuery query to CSV failed: {e}") from e 

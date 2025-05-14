@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.leadrecovery.dashboard</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>-c</string>
+        <string>cd /Users/isaacentebi/Desktop/lead_recovery_project && source .env && /Users/isaacentebi/Desktop/lead_recovery_project/fresh_env/bin/streamlit run dashboard/app.py --server.address=0.0.0.0 --server.port=8501</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>WorkingDirectory</key>
+    <string>/Users/isaacentebi/Desktop/lead_recovery_project</string>
+    <key>StandardOutPath</key>
+    <string>/Users/isaacentebi/Desktop/lead_recovery_project/dashboard_log.out</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/isaacentebi/Desktop/lead_recovery_project/dashboard_log.err</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/Users/isaacentebi/Desktop/lead_recovery_project/fresh_env/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+</dict>
+</plist> 

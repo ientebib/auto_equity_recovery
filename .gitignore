@@ -144,6 +144,9 @@ cython_debug/
 
 # Project specific
 output_run/
+recipes/*/output_run/
+fresh_env/
 legacy/
 mock_conversations/
-*.log 
+*.log
+*.marker 
