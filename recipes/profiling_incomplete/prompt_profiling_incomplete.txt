@@ -61,7 +61,7 @@ CONTACTAR_PRIMERA_VEZ | RECONTACTAR_INMEDIATO | RECONTACTAR_SONDEO | CERRAR
   * **ONE_REPLY**: "¡Hola {{nombre}}! ¿Sigo a tus órdenes para ver tu préstamo usando tu auto? Avísame y avanzamos."
 
 ## FORMATO DE SALIDA (YAML – Adherencia estricta OBLIGATORIA)
-**IMPORTANTE:** Tu respuesta DEBE ser ÚNICAMENTE un bloque YAML válido, sin texto introductorio ni explicaciones adicionales. Utiliza EXACTAMENTE las siguientes claves y NINGUNA OTRA.
+**IMPORTANTE:** Tu respuesta DEBE ser ÚNICAMENTE un bloque YAML válido, sin texto introductorio ni explicaciones adicionales. Utiliza EXACTAMENTE las siguientes 11 claves y NINGUNA OTRA:
 
 # Nota: Los campos last_message_sender, last_user_message_text y last_kuna_message_text
 # serán proporcionados automáticamente por el sistema, no es necesario incluirlos en tu respuesta YAML.
