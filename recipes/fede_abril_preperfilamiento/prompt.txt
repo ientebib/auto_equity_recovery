@@ -110,7 +110,6 @@ lead_name: "<Nombre extraído o N/A>"
 summary: "<Estado + Acción. Máx 20 palabras>"
 current_engagement_status: "<Código Taxonomía 1>"
 follow_up_attempts: <Entero>
-timing_reasoning: "<Δ tiempo y su impacto o vacío>"
 next_action_code: "<Código Taxonomía 2>"
 next_action_context: "<Opcional o vacío>"
 suggested_message_es: "<Mensaje o vacío>"

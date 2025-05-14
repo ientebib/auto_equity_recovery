@@ -34,17 +34,15 @@ Calcular delta = HOY_ES − LAST_QUERY_TIMESTAMP.Si delta ≤ 10 min:
 
 Considera que el proceso sigue su curso (no estancado).
 
-Establece:primary_stall_reason_code = PROCESS_CONTINUESnext_action_code = WAITtiming_reasoning = "Δ{delta_min} min → proceso continúa"summary debe reflejar proceso en marcha (≤20 palabras).
+Establece:primary_stall_reason_code = PROCESS_CONTINUESnext_action_code = WAITsummary debe reflejar proceso en marcha (≤20 palabras).
 
 NO generes mensaje de seguimiento.
 
-En cualquier otro caso, calcula timing_reasoning como "Δ{delta_min} min desde último mensaje" para trazabilidad.
+
 
 DIMENSIONES DE ANÁLISIS PARA CAMPOS YAML
 
 summary —  Etapa + Razón + Acción en ≤20 palabras.
-
-timing_reasoning — Breve explicación del delta de tiempo y su impacto (≤30 palabras).
 
 inferred_stall_stage — usa Taxonomía 1.
 
@@ -77,7 +75,6 @@ FORMATO DE SALIDA — SOLO YAML VÁLIDO
 # serán proporcionados automáticamente por el sistema, no es necesario incluirlos en tu respuesta YAML.
 
 summary: "<Etapa + Razón + Acción. Máx 20 palabras>"
-timing_reasoning: "<Justificación concisa si PROCESS_CONTINUES, o vacío>"
 inferred_stall_stage: "<Taxonomía 1>"
 primary_stall_reason_code: "<Taxonomía 2>"
 prior_recovery_attempt_count: <int>

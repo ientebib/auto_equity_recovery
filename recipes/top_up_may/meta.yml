@@ -23,7 +23,6 @@ expected_yaml_keys:
   # - last_message_sender
   # - last_user_message_text
   # - last_kuna_message_text
-  - timing_reasoning
   - next_action_code
   - next_action_context
   - suggested_message_es
@@ -41,7 +40,6 @@ output_columns:
   - last_message_sender
   - last_user_message_text
   - last_kuna_message_text
-  - timing_reasoning
   - next_action_code
   - next_action_context
   - suggested_message_es

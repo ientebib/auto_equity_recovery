@@ -638,11 +638,6 @@ async def run_summarization_step(
         # Create final DataFrame
         result_df = pd.DataFrame(result_rows)
         
-        # Remove timing_reasoning if present (should already be handled by not adding it)
-        # If 'timing_reasoning' in result_df.columns:
-        #     logger.info("Removing 'timing_reasoning' column from output as it's no longer needed")
-        #     result_df = result_df.drop(columns=['timing_reasoning'], errors='ignore') # Use errors='ignore'
-        
         # --- Column Selection/Exclusion ---
         include_cols = None
         exclude_cols = None
@@ -1402,11 +1397,6 @@ async def run_summarization_step(
                     results_df[key] = ""
     
     _log_memory_usage("After processing results: ")
-    
-    # Remove timing_reasoning if present
-    if 'timing_reasoning' in results_df.columns:
-        logger.info("Removing 'timing_reasoning' column from output as it's no longer needed")
-        results_df = results_df.drop(columns=['timing_reasoning'])
     
     # --- Prepare Final Results --- 
     # Start with leads_df as base

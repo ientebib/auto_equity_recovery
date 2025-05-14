@@ -28,7 +28,6 @@ output_columns:
   - summary
   - inferred_stall_stage
   - primary_stall_reason_code
-  - timing_reasoning
   - prior_recovery_attempt_count
   - last_message_sender
   - human_transfer
@@ -47,7 +46,6 @@ expected_yaml_keys:
   - summary
   - inferred_stall_stage
   - primary_stall_reason_code
-  - timing_reasoning
   - prior_recovery_attempt_count
   # - last_message_sender # Python-generated, should not be expected from LLM
   # - last_user_message_text # Python-generated, should not be expected from LLM
