@@ -13,6 +13,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../.
 
 # Import the processor class
 from lead_recovery.processors.temporal import TemporalProcessor
+from lead_recovery.recipe_schema import DataInputConfig, DataInputSQL, RecipeMeta
 
 
 def create_test_df(with_user_messages=True):
@@ -42,8 +43,22 @@ def create_test_df(with_user_messages=True):
 
 def main():
     """Run test for both cases"""
-    # Initialize the processor
-    processor = TemporalProcessor({})
+    # Initialize the processor with valid RecipeMeta parameters
+    mock_recipe_config = RecipeMeta(
+        recipe_name="test_recipe",
+        version="1.0",
+        description="Test recipe",
+        data_input=DataInputConfig(
+            lead_source_type="redshift", 
+            redshift_config=DataInputSQL(sql_file="test.sql")
+        ),
+        output_columns=["test_column"]
+    )
+    processor = TemporalProcessor(
+        recipe_config=mock_recipe_config,
+        processor_params={},
+        global_config={}
+    )
     
     print("=== Testing with user messages ===")
     df_with_user = create_test_df(with_user_messages=True)
