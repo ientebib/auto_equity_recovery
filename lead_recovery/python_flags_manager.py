@@ -22,6 +22,7 @@ def get_python_flag_columns(
     skip_handoff_detection: bool = False,
     skip_human_transfer: bool = False,
     skip_recovery_template_detection: bool = False,
+    skip_topup_template_detection: bool = False,
     skip_consecutive_templates_count: bool = False,
     skip_handoff_invitation: bool = False,
     skip_handoff_started: bool = False,
@@ -43,6 +44,7 @@ def get_python_flag_columns(
         skip_handoff_detection: Skip all handoff detection
         skip_human_transfer: Skip human transfer detection
         skip_recovery_template_detection: Skip recovery template detection
+        skip_topup_template_detection: Skip topup template detection
         skip_consecutive_templates_count: Skip counting consecutive recovery templates
         skip_handoff_invitation: Skip handoff invitation detection
         skip_handoff_started: Skip handoff started detection
@@ -212,6 +214,7 @@ def get_python_flags_from_meta(recipe_path: Path) -> Dict[str, bool]:
         "skip_handoff_detection": False,
         "skip_human_transfer": False,
         "skip_recovery_template_detection": False,
+        "skip_topup_template_detection": False,
         "skip_consecutive_templates_count": False,
         "skip_handoff_invitation": False,
         "skip_handoff_started": False,
