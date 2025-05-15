@@ -1,27 +1,25 @@
+import ast
+import logging
+import os
+import re
+import sys
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+from lead_recovery.python_flags import FUNCTION_COLUMNS
+
 """
 Function Discovery Module
 
 Utilities for discovering Python functions in the lead recovery project.
 This includes both global functions in analysis.py and recipe-specific functions in analyzer.py files.
 """
-import os
-import sys
-import re
-import inspect
-import importlib.util
-import ast
-from pathlib import Path
-from typing import List, Dict, Any, Optional, Tuple
-import logging
 
 logger = logging.getLogger(__name__)
 
 # Add project root to path for imports
 PROJECT_ROOT = Path(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 sys.path.append(str(PROJECT_ROOT))
-
-# Import the FUNCTION_COLUMNS dictionary from python_flags
-from lead_recovery.python_flags import FUNCTION_COLUMNS
 
 RECIPE_ROOT = PROJECT_ROOT / "recipes"
 

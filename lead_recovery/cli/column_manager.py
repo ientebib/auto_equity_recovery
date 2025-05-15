@@ -4,9 +4,10 @@ Column Manager Module
 Utilities for managing output columns based on enabled/disabled functions.
 """
 import logging
-import yaml
 from pathlib import Path
-from typing import Dict, Any, List, Set, Optional
+from typing import Dict, List
+
+import yaml
 
 from ..python_flags import FUNCTION_COLUMNS
 

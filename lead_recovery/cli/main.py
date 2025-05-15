@@ -1,13 +1,11 @@
 """Main entry point for CLI commands."""
 import logging
 import sys
-from typing import Optional, List
+from typing import List, Optional
 
 import typer
 
-from . import app
-from . import fetch_leads, fetch_convos, summarize, report, run
-from . import update_recipe_columns
+from . import app, fetch_convos, fetch_leads, report, run, summarize, update_recipe_columns
 
 # Configure main CLI application
 logger = logging.getLogger(__name__)
@@ -42,7 +40,7 @@ def run(
     # Configure logging level
     logging.basicConfig(level=getattr(logging, log_level.upper(), logging.INFO))
     logging.getLogger().setLevel(logging.DEBUG)
-    logger.info(f"Set log level to DEBUG explicitly.")
+    logger.info("Set log level to DEBUG explicitly.")
     
     # Call main pipeline entry point
     run.run_pipeline(

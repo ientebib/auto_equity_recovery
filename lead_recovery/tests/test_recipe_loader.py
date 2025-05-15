@@ -1,10 +1,12 @@
-import pytest
 import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from lead_recovery.recipe_loader import RecipeLoader
+import pytest
+
 from lead_recovery.exceptions import RecipeConfigurationError
+from lead_recovery.recipe_loader import RecipeLoader
+
 
 def test_path_traversal_prevention():
     """Test that the recipe loader prevents path traversal attacks."""

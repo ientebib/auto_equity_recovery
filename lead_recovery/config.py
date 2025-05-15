@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 # Pydantic v2 moved BaseSettings to pydantic_settings; fall back if older v1
 try:

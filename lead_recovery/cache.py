@@ -3,19 +3,19 @@ Cache management for the lead recovery pipeline.
 """
 from __future__ import annotations
 
-import logging
 import hashlib
-import sqlite3
-import json
-import os
-import time
+import logging
 import re
-from typing import Dict, Any, Optional, List, Tuple, Set, Iterator
-from datetime import datetime, timedelta
+import sqlite3
+import time
+from datetime import datetime
 from pathlib import Path
+from typing import Any, Dict, Iterator, List, Optional
 
-from .reporting import to_csv
+import pandas as pd
+
 from .config import settings
+from .reporting import to_csv
 
 logger = logging.getLogger(__name__)
 

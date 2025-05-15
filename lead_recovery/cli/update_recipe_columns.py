@@ -1,13 +1,14 @@
 """CLI command for updating meta.yml files with Python flag columns."""
 import logging
-from pathlib import Path
-from typing import List, Optional
 
 import typer
-import yaml
 
-from ..python_flags_manager import get_python_flag_columns, get_python_flags_from_meta, update_meta_yml_for_python_flags
 from ..config import settings
+from ..python_flags_manager import (
+    get_python_flag_columns,
+    get_python_flags_from_meta,
+    update_meta_yml_for_python_flags,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -134,9 +135,9 @@ def update_all(
         if not dry_run:
             success = update_meta_yml_for_python_flags(recipe_dir, python_columns)
             if success:
-                typer.echo(f"  Successfully updated meta.yml")
+                typer.echo("  Successfully updated meta.yml")
             else:
-                typer.echo(f"  Error updating meta.yml")
+                typer.echo("  Error updating meta.yml")
         
     if dry_run:
         typer.echo("\nDry run - no changes made")

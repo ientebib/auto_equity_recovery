@@ -1,8 +1,10 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Any, List, Optional
-import pandas as pd # Assuming conversation data might be a DataFrame
+from typing import Any, Dict, List, Optional
 
-from lead_recovery.recipe_schema import RecipeMeta # For type hinting of recipe_config
+import pandas as pd  # Assuming conversation data might be a DataFrame
+
+from lead_recovery.recipe_schema import RecipeMeta  # For type hinting of recipe_config
+
 
 class BaseProcessor(ABC):
     """

@@ -2,16 +2,18 @@
 """
 Test script to directly test the calculate_temporal_flags function
 """
-import sys
 import os
-import pandas as pd
+import sys
 from datetime import datetime, timedelta
+
+import pandas as pd
 
 # Add the project root to the path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # Import the function directly
 from lead_recovery.analysis import calculate_temporal_flags
+
 
 def create_test_df(with_user_messages=True):
     """Create a test DataFrame with or without user messages"""

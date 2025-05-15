@@ -2,6 +2,7 @@ import pytest
 
 from lead_recovery.utils import clean_email
 
+
 @pytest.mark.parametrize(
     "raw,expected",
     [

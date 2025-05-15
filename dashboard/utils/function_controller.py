@@ -1,22 +1,23 @@
+import json
+import logging
+import os
+import sys
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+from lead_recovery.cli.column_manager import generate_column_excludes
+
+from .function_discovery import get_all_functions_for_recipe
+
 """
 Function Controller Module
 
 Utilities for managing function states and generating CLI arguments based on user selections.
 """
-import logging
-from typing import Dict, List, Any, Optional
-from pathlib import Path
-import json
-import yaml
-import sys
-import os
 
 # Add project root to path for imports
 PROJECT_ROOT = Path(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 sys.path.append(str(PROJECT_ROOT))
-
-from .function_discovery import get_all_functions_for_recipe
-from lead_recovery.cli.column_manager import generate_column_excludes
 
 logger = logging.getLogger(__name__)
 

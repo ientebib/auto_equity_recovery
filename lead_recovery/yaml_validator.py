@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 import warnings
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -125,16 +125,15 @@ class YamlValidator:
             # Special handling for critical fields that must be fixed
             for enum_key in ["primary_stall_reason_code", "next_action_code"]:
                 if enum_key in parsed_data:
-                    value = parsed_data.get(enum_key)
+                    parsed_data.get(enum_key)
                     if any([error.startswith(f"Invalid value for '{enum_key}'") for error in final_validation_errors]):
                         parsed_data[enum_key] = "N/A"
                         logger.warning(f"Critical field forced to N/A: {enum_key}")
                         
         # Process any NUNCA_RESPONDIO special case
-        if temporal_flags and temporal_flags.get('NO_USER_MESSAGES_EXIST') == True:
+        if temporal_flags and temporal_flags.get('NO_USER_MESSAGES_EXIST'):
             logger.info("NO_USER_MESSAGES_EXIST condition met. Setting special values for nunca respondio case.")
             parsed_data['inferred_stall_stage'] = "PRE_VALIDACION"
-            parsed_data['primary_stall_reason_code'] = "NUNCA_RESPONDIO"
             
         return parsed_data
     

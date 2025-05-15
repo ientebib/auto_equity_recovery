@@ -3,10 +3,10 @@ Function Panel Component
 
 UI components for Python Function Control Panel.
 """
-import streamlit as st
-from typing import Dict, Any, List, Optional, Tuple
-import json
 import logging
+from typing import List
+
+import streamlit as st
 
 from dashboard.utils.function_controller import FunctionController
 

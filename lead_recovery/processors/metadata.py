@@ -1,7 +1,9 @@
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, Optional
+
 import pandas as pd
 
 from .base import BaseProcessor
+
 
 class MessageMetadataProcessor(BaseProcessor):
     """
@@ -94,6 +96,6 @@ class MessageMetadataProcessor(BaseProcessor):
                 
             return metadata
                 
-        except Exception as e:
+        except Exception:
             # Return default values in case of error
             return metadata 

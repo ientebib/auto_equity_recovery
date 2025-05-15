@@ -4,14 +4,16 @@ Test script to verify timing_reasoning removal in reporting.py
 """
 import os
 import sys
-import pandas as pd
 from pathlib import Path
+
+import pandas as pd
 
 # Add the project root to the path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # Import the to_csv function and other utilities
 from lead_recovery.reporting import to_csv
+
 
 def create_test_dataframe():
     """Create a test dataframe with timing_reasoning field"""

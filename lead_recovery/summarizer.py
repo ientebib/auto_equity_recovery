@@ -4,24 +4,21 @@ Conversation summarisation using OpenAI ChatCompletion with retries.
 from __future__ import annotations
 
 import logging
-import os
 import time
-from typing import Any, Dict, List, Optional
-import yaml
-import re
-import pandas as pd
-from openai import OpenAI, AsyncOpenAI, APIError as OpenAI_APIError
-from tenacity import retry, stop_after_attempt, wait_exponential, wait_random
+from datetime import datetime  # Added for datetime
 from pathlib import Path
-import pytz # Added for timezone
-from datetime import datetime # Added for datetime
-import hashlib
-import tiktoken
-import warnings
+from typing import Any, Dict, List, Optional
 
+import pandas as pd
+import pytz  # Added for timezone
+import tiktoken
+from openai import APIError as OpenAI_APIError
+from openai import AsyncOpenAI, OpenAI
+from tenacity import retry, stop_after_attempt, wait_exponential, wait_random
+
+from .cache import SummaryCache, compute_conversation_digest  # Import cache utilities
 from .config import settings
-from .exceptions import ApiError, ValidationError # Import custom errors
-from .cache import SummaryCache, compute_conversation_digest # Import cache utilities
+from .exceptions import ApiError, ValidationError  # Import custom errors
 
 logger = logging.getLogger(__name__)
 
@@ -244,7 +241,7 @@ class ConversationSummarizer:
                 except (AttributeError, KeyError) as e:
                     logger.warning(f"Could not extract token usage from response: {e}")
             
-            duration = time.time() - start_time
+            time.time() - start_time
             
             if not content:
                 logger.error("OpenAI response was empty despite status 'completed'")
@@ -417,7 +414,7 @@ class ConversationSummarizer:
             
             return parsed_data
 
-        except (ApiError, ValidationError) as e:
+        except (ApiError, ValidationError):
             # Let these specific exceptions propagate
             raise
         except Exception as e:  # Catch other unexpected errors

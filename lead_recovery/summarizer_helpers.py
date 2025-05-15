@@ -5,9 +5,9 @@ be tested without external services.
 """
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any, Dict
-import logging
 
 import yaml
 

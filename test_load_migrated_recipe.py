@@ -1,18 +1,19 @@
 # PATH: ientebib/auto_equity_recovery/auto_equity_recovery-02438837e55c18926cc3aa72ef3febf0f2c0c976/test_load_migrated_recipe.py
-from pathlib import Path
 import sys
+from pathlib import Path
+
+from lead_recovery.exceptions import RecipeConfigurationError
+from lead_recovery.recipe_loader import RecipeLoader
+from lead_recovery.recipe_schema import RecipeMeta  # For type hinting, optional here
 
 # Ensure the lead_recovery package is discoverable.
 # This adds the project root to the Python path.
 PROJECT_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from lead_recovery.recipe_loader import RecipeLoader
-from lead_recovery.exceptions import RecipeConfigurationError
-from lead_recovery.recipe_schema import RecipeMeta # For type hinting, optional here
 
 def main():
-    print(f"Attempting to load migrated recipe 'simulation_to_handoff'...")
+    print("Attempting to load migrated recipe 'simulation_to_handoff'...")
     print(f"Using PROJECT_ROOT: {PROJECT_ROOT}")
 
     try:

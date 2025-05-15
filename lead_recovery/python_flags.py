@@ -5,8 +5,6 @@ This module now only contains the FUNCTION_COLUMNS mapping and utility functions
 All flag-generating functions have been moved to individual processors.
 """
 
-import re
-from typing import Dict, List, Any
 
 def strip_accents(text: str) -> str:
     """Remove accents from Spanish text to simplify pattern matching."""

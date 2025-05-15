@@ -1,23 +1,24 @@
 """CLI command for fetching WhatsApp conversations from BigQuery."""
-from pathlib import Path
+import csv
 import logging
 import threading
-import csv
-from typing import List, Optional
-from queue import Queue, Empty as QueueEmpty
 from concurrent.futures import ThreadPoolExecutor
-from tqdm import tqdm
+from pathlib import Path
+from queue import Empty as QueueEmpty
+from queue import Queue
+from typing import Optional
 
-import typer
 import pandas as pd
+import typer
+
+# BigQuery imports used directly
+from google.cloud.bigquery import ArrayQueryParameter, QueryJobConfig
+from tqdm import tqdm
 
 from ..config import settings
 from ..db_clients import BigQueryClient
-from ..utils import load_sql_file
 from ..reporting import to_csv
-
-# BigQuery imports used directly
-from google.cloud.bigquery import QueryJobConfig, ArrayQueryParameter
+from ..utils import load_sql_file
 
 logger = logging.getLogger(__name__)
 
@@ -205,7 +206,7 @@ def fetch_convos(
                 try:
                     chunk_rows = future.result()
                     total_rows += chunk_rows
-                except Exception as e:
+                except Exception:
                     # Already logged in process_chunk
                     first_phone = chunk[0] if chunk else 'N/A'
                     failed_chunks.append((i, first_phone))

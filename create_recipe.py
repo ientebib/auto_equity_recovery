@@ -4,11 +4,11 @@ Recipe Generator Script
 
 Creates a new recipe with all required files set up correctly.
 """
-import os
-import sys
 import argparse
-from pathlib import Path
+import os
 from datetime import datetime
+from pathlib import Path
+
 
 def create_recipe(recipe_name, description, author, template_type="basic"):
     """
@@ -517,14 +517,14 @@ if __name__ == "__main__":
     else:
         print("2. Since this recipe doesn't include redshift.sql, you'll need to:")
         print(f"   a. Manually create output_run/{recipe_name}/ directory")
-        print(f"   b. Place a leads.csv file with a 'cleaned_phone' column there")
+        print("   b. Place a leads.csv file with a 'cleaned_phone' column there")
         print("   c. Or run with: --skip-redshift flag")
     
     print("3. The recipe will then:")
     print(f"   a. Query BigQuery using recipes/{recipe_name}/bigquery.sql for conversations")
     print(f"   b. Analyze conversations using {'analyzer.py (custom logic)' if template_type in ['analyzer', 'custom'] else 'prompt.txt (LLM)'}")
     print(f"   c. Generate results in output_run/{recipe_name}/<timestamp>/analysis.csv")
-    print(f"   d. Create a 'latest.csv' symbolic link to the most recent analysis.csv")
+    print("   d. Create a 'latest.csv' symbolic link to the most recent analysis.csv")
     
     print("\nTo check the results after running:")
     print(f"1. Look in: output_run/{recipe_name}/<timestamp>/")

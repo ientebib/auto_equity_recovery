@@ -6,14 +6,14 @@ This is a developer utility for testing recipe configurations without running th
 import logging
 import sys
 from pathlib import Path
+
 import typer
-from typing import Optional
 
 # Add parent directory to path to allow imports from lead_recovery package
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from lead_recovery.config import get_settings
-from lead_recovery.db_clients import RedshiftClient, BigQueryClient
+from lead_recovery.db_clients import BigQueryClient, RedshiftClient
 from lead_recovery.utils import load_sql_file
 
 # Configure logging

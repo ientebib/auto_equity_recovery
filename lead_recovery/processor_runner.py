@@ -8,11 +8,13 @@ processor classes based on configuration in the recipe's meta.yml.
 
 import importlib
 import logging
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
+
 import pandas as pd
-from lead_recovery.recipe_schema import RecipeMeta, PythonProcessorConfig
-from lead_recovery.processors.base import BaseProcessor
+
 from lead_recovery.exceptions import RecipeConfigurationError
+from lead_recovery.processors.base import BaseProcessor
+from lead_recovery.recipe_schema import RecipeMeta
 
 logger = logging.getLogger(__name__)
 

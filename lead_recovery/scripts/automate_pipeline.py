@@ -3,15 +3,16 @@
 Automated script to run the lead recovery pipeline with proper environment setup.
 This script can be called by cron or other schedulers to automate the pipeline.
 """
-import os
-import sys
 import logging
-import traceback
+import os
 import subprocess
+import sys
+import traceback
+from datetime import datetime, timezone
 from pathlib import Path
-from datetime import datetime, time, timezone
-import pytz
+
 import dotenv
+import pytz
 
 # Add parent directory to path to allow imports from lead_recovery package
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))

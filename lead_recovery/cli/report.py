@@ -1,15 +1,15 @@
 """CLI command for generating reports from analysis results."""
-from pathlib import Path
-from typing import Optional, List, Union
-from datetime import datetime
 import logging
+from datetime import datetime
+from pathlib import Path
+from typing import Optional
+
+import pandas as pd
+import typer
 import yaml
 
-import typer
-import pandas as pd
-
-from ..reporting import export_data
 from ..config import settings
+from ..reporting import export_data
 
 logger = logging.getLogger(__name__)
 

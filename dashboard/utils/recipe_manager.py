@@ -3,14 +3,15 @@ Recipe Manager Module
 
 Utilities for managing and loading recipe information for the dashboard.
 """
+import logging
 import os
 import sys
-from pathlib import Path
-from typing import List, Dict, Any, Optional, Tuple
-from datetime import datetime
-import yaml
 from dataclasses import dataclass
-import logging
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+import yaml
 
 # Setup logger
 logger = logging.getLogger("dashboard.recipe_manager")
@@ -273,10 +274,9 @@ def check_marker_status(recipe_name: str) -> Tuple[bool, Path, Optional[str]]:
                     try:
                         dt = datetime.fromisoformat(timestamp_str)
                         return True, marker_path, dt.strftime("%Y-%m-%d %H:%M:%S")
-                    except:
+                    except Exception:
                         return True, marker_path, timestamp_str
                 return True, marker_path, None
-        except:
+        except Exception:
             return True, marker_path, None
-    
     return False, marker_path, None 

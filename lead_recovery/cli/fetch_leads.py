@@ -1,17 +1,15 @@
 """CLI command for fetching leads from Redshift."""
-from typing import Optional
+import logging
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 import typer
-import pandas as pd
 
 from ..config import settings
 from ..db_clients import RedshiftClient
-from ..utils import load_sql_file
 from ..reporting import to_csv
 
-import logging
 logger = logging.getLogger(__name__)
 
 app = typer.Typer()

@@ -6,6 +6,18 @@ line-length = 100
 # Assume Python 3.10
 target-version = "py310"
 
+# Exclude specific directories from linting
+exclude = [
+    ".git",
+    ".github",
+    "__pycache__",
+    "build",
+    "dist",
+    "fresh_env",
+    "test_output_run",
+]
+
+[lint]
 # Select rules to enable
 select = [
     "E",   # pycodestyle errors
@@ -22,19 +34,8 @@ ignore = [
     "W292",  # No newline at end of file - will fix these gradually
 ]
 
-# Exclude specific directories from linting
-exclude = [
-    ".git",
-    ".github",
-    "__pycache__",
-    "build",
-    "dist",
-    "fresh_env",
-    "test_output_run",
-]
-
 # Per-file overrides
-[per-file-ignores]
+[lint.per-file-ignores]
 "tests/*" = [
     "F401",  # Unused imports in tests
     "D103",  # Missing docstring in public function

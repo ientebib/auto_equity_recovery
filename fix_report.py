@@ -5,12 +5,12 @@ This extracts the primary stall reason code and summary from the LLM responses
 and creates a report with the desired columns.
 """
 
-import pandas as pd
-import sqlite3
-import os
-import yaml
-import re
 import glob
+import os
+import re
+
+import pandas as pd
+import yaml
 
 # Find the most recent run directory
 run_dirs = glob.glob("output_run/marzo_cohorts/2025-05-*/")

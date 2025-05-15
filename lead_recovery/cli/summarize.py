@@ -1,15 +1,14 @@
 """CLI command for summarizing conversations using OpenAI."""
-from pathlib import Path
-from typing import Optional, List, Dict, Any
 import asyncio
-import logging
 import json
+import logging
+from pathlib import Path
+from typing import List, Optional
 
 import typer
 
-from ..config import settings
-from ..exceptions import LeadRecoveryError
 from ..analysis import run_summarization_step
+from ..config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +50,7 @@ def summarize(
             meta_config_dict = json.loads(meta_config)
             # Check if this is a serialized RecipeMeta
             if meta_config_dict.get('__is_recipe_meta__'):
-                logger.info(f"Using serialized RecipeMeta configuration")
+                logger.info("Using serialized RecipeMeta configuration")
         except Exception as e:
             logger.warning(f"Failed to parse meta_config as JSON: {e}")
 
@@ -62,7 +61,7 @@ def summarize(
     
     # Get specific skip flags from override_options, defaulting to False
     # These names must match the keys used in cli/run.py:override_options
-    skip_temporal_flags_from_meta = override_options.get("skip_temporal_flags", False)
+    override_options.get("skip_temporal_flags", False)
     skip_detailed_temporal_from_meta = override_options.get("skip_detailed_temporal", False)
     skip_hours_minutes_from_meta = override_options.get("skip_hours_minutes", False)
     skip_reactivation_flags_from_meta = override_options.get("skip_reactivation_flags", False)

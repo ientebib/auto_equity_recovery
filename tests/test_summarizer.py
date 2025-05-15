@@ -2,15 +2,16 @@
 from __future__ import annotations
 
 import asyncio
-import pytest
-from unittest.mock import patch, AsyncMock, MagicMock
-import pandas as pd
-from pathlib import Path
-import tempfile
 import os
+import tempfile
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from lead_recovery.summarizer import ConversationSummarizer
+import pandas as pd
+import pytest
+
 from lead_recovery.exceptions import ApiError, ValidationError
+from lead_recovery.summarizer import ConversationSummarizer
 
 
 @pytest.fixture

@@ -1,9 +1,11 @@
-from typing import Dict, Any, List, Optional
+from datetime import datetime
+from typing import Any, Dict, Optional
+
 import pandas as pd
 import pytz
-from datetime import datetime
 
 from .base import BaseProcessor
+
 
 class TemporalProcessor(BaseProcessor):
     """
@@ -144,6 +146,6 @@ class TemporalProcessor(BaseProcessor):
                 
             return result
             
-        except Exception as e:
+        except Exception:
             # Return default values in case of error
             return result 

@@ -1,5 +1,14 @@
 from __future__ import annotations
 
+from pathlib import Path
+from typing import List, Optional
+
+import yaml
+from pydantic import ValidationError
+
+from .exceptions import RecipeConfigurationError
+from .recipe_schema import RecipeMeta
+
 """recipe_loader.py
 Utility helpers to discover and load *recipe* folders.
 
@@ -9,15 +18,6 @@ contains the following files:
 
 The meta.yml file follows a strict schema defined in recipe_schema.py.
 """
-
-import yaml
-from pathlib import Path
-from typing import List, Optional
-from pydantic import ValidationError
-
-# Import the schema and custom exceptions
-from .recipe_schema import RecipeMeta 
-from .exceptions import RecipeConfigurationError
 
 # --------------------------------------------------------------------------- #
 # Constants

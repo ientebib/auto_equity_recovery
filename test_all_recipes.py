@@ -3,8 +3,10 @@
 Test script for all recipes with updated processor paths
 """
 
-import pandas as pd
 import logging
+
+import pandas as pd
+
 from lead_recovery.processor_runner import ProcessorRunner
 from lead_recovery.recipe_loader import RecipeLoader
 

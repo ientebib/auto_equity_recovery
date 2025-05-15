@@ -5,9 +5,10 @@ from __future__ import annotations
 
 import logging
 import shutil
-import pandas as pd
 from pathlib import Path
-from typing import Optional, List
+from typing import List, Optional
+
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 

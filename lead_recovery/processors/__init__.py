@@ -6,11 +6,11 @@ and transformation tasks for lead recovery.
 """
 from __future__ import annotations
 
-from .temporal import TemporalProcessor
-from .metadata import MessageMetadataProcessor
 from .conversation_state import ConversationStateProcessor
 from .handoff import HandoffProcessor
+from .metadata import MessageMetadataProcessor
 from .template import TemplateDetectionProcessor
+from .temporal import TemporalProcessor
 from .validation import ValidationProcessor
 
 __all__ = [

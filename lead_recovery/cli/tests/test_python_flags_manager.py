@@ -1,8 +1,6 @@
 """Tests for python_flags_manager module"""
-import os
-import pytest
-from pathlib import Path
 from lead_recovery.python_flags_manager import get_python_flag_columns
+
 
 def test_get_python_flag_columns_all_enabled():
     """Test getting columns with all flags enabled"""

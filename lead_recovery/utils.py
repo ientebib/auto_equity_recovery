@@ -4,11 +4,9 @@ Generic utility functions used across the lead recovery pipeline.
 from __future__ import annotations
 
 import logging
-import pandas as pd
 from pathlib import Path
-from typing import Any, Dict
 
-from .config import settings
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 

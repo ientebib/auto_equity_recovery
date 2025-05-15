@@ -3,20 +3,16 @@ DB connection and query helpers for Redshift and BigQuery.
 """
 from __future__ import annotations
 
+import csv
 import logging
 import re
 import time
-import tempfile
-import uuid
-import csv
-import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List
 
 import pandas as pd
 import redshift_connector
 from google.cloud import bigquery
-from google.oauth2 import service_account
 
 from .config import settings
 from .exceptions import DatabaseConnectionError, DatabaseQueryError
@@ -105,7 +101,6 @@ class RedshiftClient:
                 if params:
                     # Convert dict params to proper format expected by redshift_connector
                     # redshift_connector expects a tuple of values, not a dict
-                    param_names = []
                     param_values = []
                     
                     # Extract parameter placeholders from SQL

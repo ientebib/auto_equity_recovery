@@ -3,11 +3,10 @@ Functions to output analysis results to CSV, HTML, and JSON formats.
 """
 from __future__ import annotations
 
-import logging
 import csv
-import json
+import logging
 from pathlib import Path
-from typing import List, Optional, Dict, Any, Union, Literal
+from typing import Dict, List, Optional, Union
 
 import pandas as pd
 

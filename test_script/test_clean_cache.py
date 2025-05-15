@@ -2,8 +2,10 @@
 """
 Script to clean timing_reasoning from cache.csv
 """
-import pandas as pd
 from pathlib import Path
+
+import pandas as pd
+
 
 def main():
     cache_path = Path('output_run/simulation_to_handoff/cache.csv')
@@ -18,7 +20,7 @@ def main():
     print(f"Original columns: {df.columns.tolist()}")
     
     if 'timing_reasoning' in df.columns:
-        print(f"Removing timing_reasoning column from cache file")
+        print("Removing timing_reasoning column from cache file")
         df = df.drop(columns=['timing_reasoning'])
         
         # Backup original
@@ -32,7 +34,7 @@ def main():
         
         print(f"Cleaned columns: {df.columns.tolist()}")
     else:
-        print(f"No timing_reasoning column found in cache file")
+        print("No timing_reasoning column found in cache file")
 
 if __name__ == "__main__":
     main() 

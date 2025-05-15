@@ -1,5 +1,7 @@
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict, List, Optional
+
 import pandas as pd
+
 
 def strip_accents(text: str) -> str:
     """

@@ -1,9 +1,12 @@
 import re
-from typing import Dict, Any, List, Optional, Union
+from typing import Any, Dict, List, Optional
+
 import pandas as pd
 
+from lead_recovery.processors.utils import convert_df_to_message_list, strip_accents
+
 from .base import BaseProcessor
-from lead_recovery.processors.utils import strip_accents, convert_df_to_message_list
+
 
 class HandoffProcessor(BaseProcessor):
     """

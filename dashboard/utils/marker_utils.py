@@ -3,9 +3,9 @@ Marker Utilities Module
 
 Functions for managing Redshift marker files.
 """
-from pathlib import Path
-from datetime import datetime
 import logging
+from datetime import datetime
+from pathlib import Path
 
 logger = logging.getLogger("dashboard.marker_utils")
 

@@ -7,34 +7,33 @@ A Streamlit dashboard for the Lead Recovery Pipeline that allows users to:
 - Monitor pipeline execution
 - Explore recipe configurations
 """
-import os
-import sys
-import time
-import subprocess
 import logging
-from pathlib import Path
-from datetime import datetime
-import threading
+import os
 import queue
-import yaml
-import json
+import subprocess
+import sys
+import threading
+import time
+from datetime import datetime
+from pathlib import Path
+
 import streamlit as st
-from typing import List, Dict, Any, Tuple, Optional
-import re
 
 # Add project root to path for imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # Import from utils
-from dashboard.utils.recipe_manager import get_recipes, get_recipe_details, Recipe, check_marker_status, get_recipe_outputs
-from dashboard.utils.file_utils import read_file_content, open_finder, get_latest_output_timestamp
-from dashboard.utils.log_monitor import LogMonitor, capture_output
-from dashboard.utils.process_manager import ProcessManager, run_recipe_process, get_running_processes, terminate_process
-from dashboard.utils.marker_utils import (
-    has_redshift_marker, has_bigquery_marker, 
-    create_redshift_marker, create_bigquery_marker
-)
 from dashboard.components import render_function_panel
+from dashboard.utils.file_utils import get_latest_output_timestamp, read_file_content
+from dashboard.utils.log_monitor import capture_output
+from dashboard.utils.marker_utils import has_redshift_marker
+from dashboard.utils.process_manager import ProcessManager, terminate_process
+from dashboard.utils.recipe_manager import (
+    Recipe,
+    check_marker_status,
+    get_recipe_details,
+    get_recipes,
+)
 
 # Set page config
 st.set_page_config(
@@ -704,18 +703,6 @@ def render_running_processes_panel():
         # Only show "No running processes" if we're not running anything ourselves
         st.info("No recipe processes are currently running on the system.")
 
-def terminate_process(pid):
-    """Terminate a process by PID."""
-    try:
-        if os.name == 'posix':  # macOS or Linux
-            os.kill(int(pid), 15)  # SIGTERM
-        elif os.name == 'nt':  # Windows
-            subprocess.run(["taskkill", "/PID", pid, "/F"])
-        return True
-    except Exception as e:
-        logger.error(f"Error terminating process {pid}: {e}")
-        return False
-
 def render_log_output():
     """Render the log output area"""
     if st.session_state.running_process:
@@ -757,7 +744,7 @@ def render_log_output():
                         remaining_time = process.info.get_estimated_remaining_time()
                         
                         # Show progress bar
-                        progress_bar = st.progress(progress)
+                        st.progress(progress)
                         
                         # Show time information
                         st.caption(f"⏱️ Elapsed: {format_time(elapsed_time)} | Estimated remaining: {format_time(remaining_time)}")

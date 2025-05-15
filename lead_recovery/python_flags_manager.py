@@ -7,9 +7,10 @@ based on which Python flag functions are enabled or disabled.
 """
 
 import logging
-import yaml
 from pathlib import Path
-from typing import Dict, List, Set, Any, Optional
+from typing import Dict, List
+
+import yaml
 
 from .python_flags import FUNCTION_COLUMNS
 

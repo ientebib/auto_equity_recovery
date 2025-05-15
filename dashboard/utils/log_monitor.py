@@ -3,12 +3,12 @@ Log Monitor Module
 
 Utilities for monitoring log output.
 """
-import threading
-import queue
-import time
 import logging
-from typing import List, Dict, Any, TextIO, Optional
+import queue
 import subprocess
+import threading
+import time
+from typing import List
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +62,7 @@ def capture_output(process: subprocess.Popen, log_queue: queue.Queue) -> None:
         logger.error(error_msg)
         try:
             log_queue.put(f"ERROR: {error_msg}")
-        except:
+        except Exception:
             pass
 
 class LogMonitor:

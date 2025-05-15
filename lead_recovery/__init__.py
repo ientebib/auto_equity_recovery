@@ -1,3 +1,12 @@
+from importlib import import_module as _import
+from types import ModuleType as _ModuleType
+from typing import List as _List
+
+from .analysis import run_summarization_step
+from .cache import normalize_phone
+from .fs import ensure_dir, update_link
+from .gsheets import upload_to_google_sheets
+
 __version__ = "0.1.0"
 
 """lead_recovery package
@@ -10,9 +19,6 @@ once.  It lets us install the project as `pip install -e .` and run the CLI via
 
 When we later move modules into this folder we can drop these indirections.
 """
-from importlib import import_module as _import
-from types import ModuleType as _ModuleType
-from typing import List as _List
 
 _modules: _List[str] = [
     "config",
@@ -43,10 +49,6 @@ for _module in _modules:
         globals()[_module].__package__ = "lead_recovery"
 
 # Directly import functions from modules that were previously re-exported through pipeline.py
-from .fs import update_link, ensure_dir
-from .gsheets import upload_to_google_sheets
-from .cache import normalize_phone
-from .analysis import run_summarization_step
 
 __all__: _List[str] = _modules + [
     "run_summarization_step", 

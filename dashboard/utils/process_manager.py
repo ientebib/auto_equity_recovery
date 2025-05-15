@@ -3,18 +3,18 @@ Process Manager Module
 
 Utilities for running and managing subprocesses.
 """
+import logging
 import os
-import sys
+import queue
+import re
 import subprocess
 import threading
-import queue
-import logging
 import time
-import psutil
-import re
-from typing import List, Optional, Any, Dict, NamedTuple
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List
+
+import psutil
 
 from .log_monitor import capture_output
 
