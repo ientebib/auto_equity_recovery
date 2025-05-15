@@ -40,6 +40,23 @@ logger = logging.getLogger(__name__)
 # Define missing constant
 SENDER_COLUMN_NAME = "msg_from"
 
+# Provide backward compatibility for tests
+def calculate_temporal_flags(conversation_data):
+    """Legacy function for calculating temporal flags from conversation data.
+    
+    This is a backwards compatibility wrapper around the TemporalProcessor class.
+    New code should use TemporalProcessor directly.
+    
+    Args:
+        conversation_data: DataFrame containing conversation messages
+        
+    Returns:
+        Dictionary of temporal flags
+    """
+    from .processors.temporal import TemporalProcessor
+    processor = TemporalProcessor({})  # Initialize with default parameters
+    return processor.process(None, conversation_data, {})
+
 async def run_summarization_step(
     output_dir: Path,
     prompt_template_path: Optional[Path] = None,
