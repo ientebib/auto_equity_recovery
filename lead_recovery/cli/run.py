@@ -3,19 +3,23 @@ import os
 import logging
 import importlib
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 import json
 
 import typer
 import yaml
+import pandas as pd
 
 from ..config import settings
-from ..exceptions import RecipeNotFoundError
+from ..exceptions import RecipeNotFoundError, LeadRecoveryError
 from .fetch_leads import fetch_leads
 from .fetch_convos import fetch_convos
 from .summarize import summarize
 from .report import report
+from ..recipe_schema import PythonProcessorConfig, RecipeMeta
+from ..processor_runner import ProcessorRunner
+from ..recipe_loader import RecipeLoader
 
 logger = logging.getLogger(__name__)
 
@@ -53,8 +57,12 @@ def create_redshift_marker(recipe: str) -> Path:
     logger.info(f"Created Redshift marker: {marker_path}")
     return marker_path
 
-def setup_environment():
-    """Set up environment variables needed for the pipeline"""
+def setup_environment() -> bool:
+    """Set up environment variables needed for the pipeline
+    
+    Returns:
+        bool: True if setup successful, False otherwise
+    """
     # Set service account credentials path if not already set
     credentials_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
     
@@ -69,283 +77,391 @@ def setup_environment():
     logger.info(f"Using GOOGLE_APPLICATION_CREDENTIALS: {credentials_path}")
     return True
 
-@app.callback(invoke_without_command=True)
-def run_pipeline(
-    recipe: str = typer.Option(..., help="Recipe name (folder name under recipes/)"),
-    skip_redshift: bool = typer.Option(False, help="Skip fetching leads from Redshift"),
-    skip_bigquery: bool = typer.Option(False, help="Skip fetching conversations from BigQuery"),
-    skip_summarize: bool = typer.Option(False, help="Skip summarizing conversations"),
-    max_workers: Optional[int] = typer.Option(None, help="Max concurrent workers for OpenAI calls"),
-    output_dir: Optional[str] = typer.Option(None, help="Override base output directory"),
-    use_cached_redshift: bool = typer.Option(True, help="Use cached Redshift data if available"),
-    use_cache: bool = typer.Option(True, "--use-cache/--no-cache", help="Use summarization cache if available."),
-    ignore_redshift_marker: bool = typer.Option(False, "--ignore-redshift-marker", help="Ignore existing Redshift marker and run query even if already run today."),
-    skip_temporal_flags: bool = typer.Option(False, help="Skip calculating temporal flags like hours since last message"),
-    skip_detailed_temporal: bool = typer.Option(False, help="Skip detailed temporal processing (use simplified time calculations)"),
-    skip_hours_minutes: bool = typer.Option(False, help="Skip hours/minutes calculations (HOURS_MINUTES_SINCE_LAST_USER_MESSAGE, HOURS_MINUTES_SINCE_LAST_MESSAGE)"),
-    skip_reactivation_flags: bool = typer.Option(False, help="Skip reactivation flags (IS_WITHIN_REACTIVATION_WINDOW, IS_RECOVERY_PHASE_ELIGIBLE)"),
-    skip_timestamps: bool = typer.Option(False, help="Skip timestamp formatting (LAST_USER_MESSAGE_TIMESTAMP_TZ, LAST_MESSAGE_TIMESTAMP_TZ)"),
-    skip_user_message_flag: bool = typer.Option(False, help="Skip user flag (NO_USER_MESSAGES_EXIST)"),
-    skip_handoff_detection: bool = typer.Option(False, help="Skip handoff detection in conversations"),
-    skip_metadata_extraction: bool = typer.Option(False, help="Skip extraction of message metadata"),
-    skip_handoff_invitation: bool = typer.Option(False, help="Skip handoff invitation detection"),
-    skip_handoff_started: bool = typer.Option(False, help="Skip handoff started detection"),
-    skip_handoff_finalized: bool = typer.Option(False, help="Skip handoff finalized detection"),
-    skip_human_transfer: bool = typer.Option(False, help="Skip human transfer detection"),
-    skip_recovery_template_detection: bool = typer.Option(False, help="Skip recovery template detection (simulation_to_handoff recipe)"),
-    skip_consecutive_templates_count: bool = typer.Option(False, help="Skip counting consecutive recovery templates"),
-    include_columns: Optional[str] = typer.Option(None, help="Comma-separated list of columns to include in the output"),
-    exclude_columns: Optional[str] = typer.Option(None, help="Comma-separated list of columns to exclude from the output"),
-    limit: Optional[int] = typer.Option(None, help="Limit the number of conversations to process (for testing)"),
-):
-    """Run the full pipeline for a recipe: fetch leads, fetch conversations, summarize."""
-    # Path to recipe directory
-    recipe_dir = Path(settings.PROJECT_ROOT) / "recipes" / recipe
-    if not recipe_dir.exists():
-        raise RecipeNotFoundError(f"Recipe directory '{recipe}' not found at: {recipe_dir}")
-
-    # Set up environment and credentials
-    if not setup_environment():
-        logger.error("Environment setup failed")
-        raise typer.Exit(1)
-
-    # Optional log - who is running the script?
+def load_recipe_config(recipe_name: str, recipe_dir: Path, skip_processors: Optional[List[str]] = None,
+                      run_only_processors: Optional[List[str]] = None) -> RecipeMeta:
+    """Load recipe configuration from meta.yml and apply processor filters.
+    
+    Args:
+        recipe_name: Name of the recipe
+        recipe_dir: Path to the recipe directory
+        skip_processors: List of processor class names to skip
+        run_only_processors: List of processor class names to run exclusively
+        
+    Returns:
+        RecipeMeta object containing recipe configuration
+    """
     try:
-        import getpass
-        logger.info("Running as user: %s", getpass.getuser())
-    except Exception as e_user:  # Ignore errors
-        logger.debug("Couldn't detect running user: %s", e_user)
+        # Load the recipe using RecipeLoader
+        logger.info(f"Loading recipe configuration for: {recipe_name}")
+        recipe_loader = RecipeLoader()
+        recipe_meta = recipe_loader.load_recipe_meta(recipe_name)
+        
+        # Apply processor filtering based on CLI options
+        if recipe_meta.python_processors:
+            original_processors = recipe_meta.python_processors
+            filtered_processors = []
+            
+            if run_only_processors:
+                logger.info(f"Filtering to only run processors: {run_only_processors}")
+                for proc_config in original_processors:
+                    module_path = proc_config.module
+                    class_name = module_path.split('.')[-1] if module_path else ''
+                    if class_name in run_only_processors:
+                        filtered_processors.append(proc_config)
+                        logger.info(f"Including processor: {class_name}")
+                    else:
+                        logger.info(f"Excluding processor: {class_name} (not in run_only_processors list)")
+            elif skip_processors:
+                logger.info(f"Skipping processors: {skip_processors}")
+                for proc_config in original_processors:
+                    module_path = proc_config.module
+                    class_name = module_path.split('.')[-1] if module_path else ''
+                    if class_name not in skip_processors:
+                        filtered_processors.append(proc_config)
+                        logger.info(f"Including processor: {class_name}")
+                    else:
+                        logger.info(f"Excluding processor: {class_name} (in skip_processors list)")
+            else:
+                # If no filtering options specified, use all processors
+                filtered_processors = original_processors
+                
+            # Update recipe_meta with filtered processors
+            recipe_meta.python_processors = filtered_processors
+            logger.info(f"Using {len(filtered_processors)} of {len(original_processors)} processors after filtering")
+        
+        return recipe_meta
+        
+    except Exception as e:
+        logger.error(f"Error loading recipe configuration for {recipe_name}: {e}", exc_info=True)
+        # Return empty RecipeMeta as fallback
+        empty_meta = RecipeMeta(recipe_name=recipe_name)
+        return empty_meta
 
-    # Set the output directory, ensure it exists
-    if output_dir is None:
-        output_dir = Path(settings.OUTPUT_DIR) / recipe
-    else:
-        output_dir = Path(output_dir) / recipe
-    output_dir.mkdir(parents=True, exist_ok=True)
-    logger.info(f"Using output directory: {output_dir}")
-
+def setup_sql_and_prompt_paths(recipe_dir: Path, recipe_meta: RecipeMeta) -> Dict[str, Path]:
+    """Set up paths to SQL and prompt files based on the recipe configuration.
+    
+    Args:
+        recipe_dir: Path to the recipe directory
+        recipe_meta: RecipeMeta object containing recipe configuration
+        
+    Returns:
+        Dictionary containing paths to SQL and prompt files
+    """
     # Default SQL filenames
     default_redshift_sql_name = "redshift.sql"
     default_bigquery_sql_name = "bigquery.sql"
     default_prompt_name = "prompt.txt"
 
-    # Initialize paths and schema
+    # Get SQL filenames from recipe_meta if specified, else use defaults
     redshift_sql_file_name = default_redshift_sql_name
     bigquery_sql_file_name = default_bigquery_sql_name
     prompt_file_name = default_prompt_name
-    yaml_schema = None
-    gsheet_config = None
-    meta_yaml = {} # Ensure meta_yaml is a dict
-    skip_detailed_temporal_processing_for_recipe = False # Default
-
-    meta_path = recipe_dir / "meta.yml"
-    if meta_path.exists():
-        try:
-            with open(meta_path, 'r') as f:
-                loaded_meta_yaml = yaml.safe_load(f)
-                if isinstance(loaded_meta_yaml, dict):
-                    meta_yaml = loaded_meta_yaml
-                    # Get SQL filenames from meta.yml if specified, else use defaults
-                    redshift_sql_file_name = meta_yaml.get('redshift_sql', default_redshift_sql_name)
-                    bigquery_sql_file_name = meta_yaml.get('bigquery_sql', default_bigquery_sql_name)
-                    prompt_file_name = meta_yaml.get('prompt_file', default_prompt_name)
-
-                    # Extract expected YAML keys for validation
-                    yaml_schema = meta_yaml.get('expected_yaml_keys')
-                    if isinstance(yaml_schema, list):
-                        logger.info(f"Loaded {len(yaml_schema)} expected keys from meta.yml")
-                    elif yaml_schema is not None: # If key exists but not a list
-                        logger.warning("'expected_yaml_keys' in meta.yml is not a list, will be ignored.")
-                        yaml_schema = None
-
-                    # Extract Google Sheets information if present
-                    sheets_info = meta_yaml.get('google_sheets')
-                    if isinstance(sheets_info, dict):
-                        sheet_id = sheets_info.get('sheet_id')
-                        worksheet = sheets_info.get('worksheet_name') # Corrected key from previous diff
-                        if sheet_id and worksheet:
-                            gsheet_config = {"sheet_id": sheet_id, "worksheet_name": worksheet}
-                            logger.info(f"Configured Google Sheets integration from meta.yml: {gsheet_config}")
-                        else:
-                            logger.debug("'google_sheets' in meta.yml is missing 'sheet_id' or 'worksheet_name'.")
-                    elif sheets_info is not None:
-                        logger.warning("'google_sheets' in meta.yml is not a dictionary.")
-
-                    # NEW: Check for skip_detailed_temporal_processing flag
-                    behavior_flags = meta_yaml.get('behavior_flags', {})
-                    if isinstance(behavior_flags, dict):
-                        skip_detailed_temporal_processing_for_recipe = behavior_flags.get('skip_detailed_temporal_processing', False)
-                        # Override with CLI options if specified
-                        if skip_detailed_temporal:
-                            skip_detailed_temporal_processing_for_recipe = True
-                            logger.info("Overriding recipe config: Skipping detailed temporal processing (CLI option)")
-
-                        if skip_detailed_temporal_processing_for_recipe:
-                            logger.info(f"Recipe {recipe} configured to skip detailed temporal processing.")
-                    else:
-                        logger.warning("'behavior_flags' in meta.yml is not a dictionary, will use defaults.")
-                        # Still use CLI options if meta.yml format is invalid
-                        if skip_detailed_temporal:
-                            skip_detailed_temporal_processing_for_recipe = True
-                            logger.info("Using CLI option: Skipping detailed temporal processing")
-                else:
-                    logger.warning(f"meta.yml for recipe {recipe} is not a valid YAML dictionary.")
-        except Exception as e:
-            logger.error(f"Error loading meta.yml for recipe {recipe}: {e}", exc_info=True)
-
-    # Construct full paths to SQL and prompt files using names from meta.yml or defaults
+    
+    # Check data_input in RecipeMeta if available
+    if hasattr(recipe_meta, 'data_input') and recipe_meta.data_input:
+        if hasattr(recipe_meta.data_input, 'redshift_config') and recipe_meta.data_input.redshift_config:
+            if hasattr(recipe_meta.data_input.redshift_config, 'sql_file') and recipe_meta.data_input.redshift_config.sql_file:
+                redshift_sql_file_name = recipe_meta.data_input.redshift_config.sql_file
+                
+        if hasattr(recipe_meta.data_input, 'conversation_sql_file_bigquery') and recipe_meta.data_input.conversation_sql_file_bigquery:
+            bigquery_sql_file_name = recipe_meta.data_input.conversation_sql_file_bigquery
+    
+    # Check llm_config in RecipeMeta if available
+    if hasattr(recipe_meta, 'llm_config') and recipe_meta.llm_config:
+        if hasattr(recipe_meta.llm_config, 'prompt_file') and recipe_meta.llm_config.prompt_file:
+            prompt_file_name = recipe_meta.llm_config.prompt_file
+    
+    logger.info(f"Using prompt file name: {prompt_file_name}")
+    
+    # Construct full paths to SQL and prompt files
     redshift_sql_path = recipe_dir / redshift_sql_file_name
     bigquery_sql_path = recipe_dir / bigquery_sql_file_name
     prompt_path = recipe_dir / prompt_file_name
 
+    # Log SQL path information
     if redshift_sql_path.exists():
-        settings.RS_SQL_PATH = redshift_sql_path
         logger.info(f"Using recipe Redshift SQL: {redshift_sql_path}")
     else:
-        logger.warning(f"Redshift SQL file '{redshift_sql_path.name}' not found for recipe {recipe}. Downstream Redshift steps might fail or use incorrect defaults if not skipped.")
-        # Decide if we should revert to a global default or error out if essential
-        # For now, it will just use whatever was last in settings.RS_SQL_PATH (potentially from config.py defaults)
+        logger.warning(f"Redshift SQL file '{redshift_sql_path.name}' not found for recipe. Downstream Redshift steps might fail if not skipped.")
 
     if bigquery_sql_path.exists():
-        settings.BQ_SQL_PATH = bigquery_sql_path
         logger.info(f"Using recipe BigQuery SQL: {bigquery_sql_path}")
     else:
-        logger.warning(f"BigQuery SQL file '{bigquery_sql_path.name}' not found for recipe {recipe}. Downstream BigQuery steps might fail or use incorrect defaults if not skipped.")
+        logger.warning(f"BigQuery SQL file '{bigquery_sql_path.name}' not found for recipe. Downstream BigQuery steps might fail if not skipped.")
 
-    if not prompt_path.exists():
-        prompt_path = None # Explicitly set to None if not found
-        logger.warning(f"Prompt file '{prompt_file_name}' not found for recipe {recipe}. Summarization will use default prompt if available, or fail.")
+    if prompt_path.exists():
+        logger.info(f"Using recipe prompt template: {prompt_path}")
+    else:
+        logger.warning(f"Prompt file '{prompt_file_name}' not found for recipe. Summarization may fail or use default prompt.")
 
-    # Check for cached leads data
-    leads_path = output_dir / "leads.csv"
+    return {
+        "redshift_sql_path": redshift_sql_path,
+        "bigquery_sql_path": bigquery_sql_path,
+        "prompt_path": prompt_path if prompt_path.exists() else None
+    }
+
+def handle_csv_leads(recipe_dir: Path, recipe_meta: RecipeMeta, output_dir: Path) -> bool:
+    """Handle CSV lead source from recipe.
     
-    # --- (1) REDSHIFT --- fetch from Redshift if needed
+    Args:
+        recipe_dir: Path to the recipe directory
+        recipe_meta: RecipeMeta object containing recipe configuration
+        output_dir: Output directory where leads.csv should be placed
+        
+    Returns:
+        bool: True if CSV handling was successful, False otherwise
+    """
+    # Check if the recipe uses CSV as lead source
+    if (not hasattr(recipe_meta, 'data_input') or 
+        not hasattr(recipe_meta.data_input, 'lead_source_type') or
+        recipe_meta.data_input.lead_source_type != 'csv'):
+        # Not a CSV source, nothing to do
+        return True
+    
+    logger.info("Recipe uses CSV as lead source")
+    
+    # Get the CSV file name from recipe_meta
+    csv_file_name = "leads.csv"  # Default
+    if (hasattr(recipe_meta.data_input, 'csv_config') and 
+        recipe_meta.data_input.csv_config and 
+        hasattr(recipe_meta.data_input.csv_config, 'csv_file')):
+        csv_file_name = recipe_meta.data_input.csv_config.csv_file
+    
+    # Source path (recipe dir)
+    source_path = recipe_dir / csv_file_name
+    
+    # Ensure the output directory path is absolute
+    dest_path = output_dir.absolute() / "leads.csv"
+    
+    # Use resolve() to get canonical path for both source and destination
+    source_path = source_path.resolve()
+    dest_path = dest_path.resolve()
+    
+    # Check if source file exists
+    if not source_path.exists():
+        logger.error(f"CSV lead file not found: {source_path}")
+        return False
+    
+    # Check if source and destination are the same file
+    if source_path == dest_path:
+        logger.info(f"Source and destination are the same file: {source_path}. No copy needed.")
+        return True
+    
+    try:
+        # Create parent directories if they don't exist
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Copy the CSV file to the output directory
+        import shutil
+        shutil.copy2(source_path, dest_path)
+        logger.info(f"Copied CSV leads from {source_path} to {dest_path}")
+        return True
+    except Exception as e:
+        logger.error(f"Error copying CSV leads file: {e}", exc_info=True)
+        
+        # Check if the file already exists at the destination
+        if dest_path.exists():
+            logger.info(f"Destination file already exists: {dest_path}. Using existing file.")
+            return True
+        
+        return False
+
+def handle_redshift_stage(recipe: str, skip_redshift: bool, redshift_sql_path: Path, 
+                          ignore_redshift_marker: bool, use_cached_redshift: bool, 
+                          leads_path: Path, output_dir: Path) -> bool:
+    """Handle the Redshift data fetching stage.
+    
+    Args:
+        recipe: Name of the recipe
+        skip_redshift: Whether to skip Redshift fetch
+        redshift_sql_path: Path to Redshift SQL file
+        ignore_redshift_marker: Whether to ignore existing Redshift marker
+        use_cached_redshift: Whether to use cached Redshift data
+        leads_path: Path to leads CSV file
+        output_dir: Output directory
+        
+    Returns:
+        bool: True if Redshift stage completed successfully, False otherwise
+    """
+    # Handle skipping logic
     if skip_redshift:
         logger.info("Skipping Redshift step")
         if not leads_path.exists():
             logger.warning("Skipped Redshift but leads.csv does not exist. Downstream steps may fail.")
-    else:
-        # Check if Redshift query exists for this recipe
-        has_redshift_query = redshift_sql_path.exists()
-        if not has_redshift_query:
-            # If the recipe doesn't have a redshift.sql file, automatically skip Redshift
-            # This ensures recipes without Redshift don't create markers or try to run queries
-            logger.info(f"No Redshift query file found for recipe {recipe}, skipping Redshift")
-            skip_redshift = True
+        return True
+    
+    # Check if Redshift query exists for this recipe
+    has_redshift_query = redshift_sql_path.exists()
+    if not has_redshift_query:
+        # If the recipe doesn't have a redshift.sql file, automatically skip Redshift
+        logger.info(f"No Redshift query file found for recipe {recipe}, skipping Redshift")
+        return True
+    
+    # Check for today's marker unless explicitly ignored
+    marker_exists, marker_path = check_redshift_marker(recipe)
+    
+    if marker_exists and not ignore_redshift_marker:
+        logger.info(f"Redshift marker found for today ({marker_path}). Using cached Redshift data.")
+        # Only skip if cached data exists
+        if use_cached_redshift and leads_path.exists():
+            logger.info(f"Using cached leads data from {leads_path}")
+            return True
         else:
-            # Check for today's marker unless explicitly ignored
-            marker_exists, marker_path = check_redshift_marker(recipe)
+            logger.info("Redshift marker exists but no cached leads data found. Will query Redshift.")
+    else:
+        if marker_exists and ignore_redshift_marker:
+            logger.info(f"Ignoring existing Redshift marker ({marker_path}) as requested.")
             
-            if marker_exists and not ignore_redshift_marker:
-                logger.info(f"Redshift marker found for today ({marker_path}). Using cached Redshift data.")
-                # Only skip if cached data exists
-                if use_cached_redshift and leads_path.exists():
-                    logger.info(f"Using cached leads data from {leads_path}")
-                    skip_redshift = True
-                else:
-                    logger.info("Redshift marker exists but no cached leads data found. Will query Redshift.")
-            else:
-                if marker_exists and ignore_redshift_marker:
-                    logger.info(f"Ignoring existing Redshift marker ({marker_path}) as requested.")
-                    
-                # If we get here, either:
-                # 1. No marker exists for today, or
-                # 2. Force flag is set to ignore the marker, or
-                # 3. use_cached_redshift is False
-                logger.info("Will query Redshift for fresh data.")
-                
-    # Perform the Redshift query if not skipped
-    if not skip_redshift:
-        try:
-            logger.info("Fetching leads from Redshift...")
-            fetch_leads(output_dir=output_dir)
-            logger.info("Redshift fetch completed.")
-            
-            # Create a marker file to indicate successful Redshift query for today
-            create_redshift_marker(recipe)
-        except Exception as e:
-            logger.error(f"Error fetching from Redshift: {e}", exc_info=True)
-            # If this fails and we have cached data, try to use it
-            if use_cached_redshift and leads_path.exists():
-                logger.warning("Falling back to cached leads data after Redshift error")
-            else:
-                # No fallback available
-                raise typer.Exit(1)
+        # If we get here, either:
+        # 1. No marker exists for today, or
+        # 2. Force flag is set to ignore the marker, or
+        # 3. use_cached_redshift is False
+        logger.info("Will query Redshift for fresh data.")
+    
+    # Perform the Redshift query
+    try:
+        logger.info(f"Fetching leads from Redshift using SQL file: {redshift_sql_path}")
+        
+        # Import fetch_leads function to directly fetch leads
+        from ..cli.fetch_leads import fetch_leads
+        
+        # Call fetch_leads with the SQL file path
+        fetch_leads(output_dir=output_dir, sql_file=redshift_sql_path)
+        
+        # Create a marker file to indicate successful Redshift query for today
+        create_redshift_marker(recipe)
+        return True
+    except Exception as e:
+        logger.error(f"Error fetching from Redshift: {e}", exc_info=True)
+        # If this fails and we have cached data, try to use it
+        if use_cached_redshift and leads_path.exists():
+            logger.warning("Falling back to cached leads data after Redshift error")
+            return True
+        return False
 
-    # --- (2) BIGQUERY --- fetch conversations if needed
+def handle_bigquery_stage(skip_bigquery: bool, output_dir: Path, bigquery_sql_path: Path) -> bool:
+    """Handle the BigQuery data fetching stage.
+    
+    Args:
+        skip_bigquery: Whether to skip BigQuery fetch
+        output_dir: Output directory
+        bigquery_sql_path: Path to BigQuery SQL file
+        
+    Returns:
+        bool: True if BigQuery stage completed successfully, False otherwise
+    """
+    conversations_path = output_dir / "conversations.csv"
+    
     if skip_bigquery:
         logger.info("Skipping BigQuery step")
-        if not (output_dir / "conversations.csv").exists():
+        if not conversations_path.exists():
             logger.warning("Skipped BigQuery but conversations.csv does not exist. Downstream steps may fail.")
-    else:
-        logger.info("Fetching conversations from BigQuery...")
-        fetch_convos(output_dir=output_dir, batch_size=settings.BQ_BATCH_SIZE)
+        return True
+    
+    # Check if BigQuery SQL file exists
+    if not bigquery_sql_path.exists():
+        logger.warning(f"BigQuery SQL file not found: {bigquery_sql_path}")
+        if conversations_path.exists():
+            logger.info("Using existing conversations.csv file")
+            return True
+        else:
+            logger.error("No BigQuery SQL file and no existing conversations.csv file")
+            return False
+    
+    try:
+        logger.info(f"Fetching conversations from BigQuery using SQL file: {bigquery_sql_path}")
+        
+        # Import fetch_convos function to directly fetch conversations
+        from ..cli.fetch_convos import fetch_convos
+        
+        # Call fetch_convos with the SQL file path
+        fetch_convos(output_dir=output_dir, batch_size=settings.BQ_BATCH_SIZE, sql_file=bigquery_sql_path)
+        
         logger.info("BigQuery fetch completed.")
+        return True
+    except Exception as e:
+        logger.error(f"Error fetching from BigQuery: {e}", exc_info=True)
+        # If this fails and we have cached data, try to use it
+        if conversations_path.exists():
+            logger.warning("Falling back to cached conversations data after BigQuery error")
+            return True
+        return False
 
-    # --- (3) SUMMARIZE --- run OpenAI summarization if needed
+def handle_summarize_stage(skip_summarize: bool, output_dir: Path, prompt_path: Optional[Path],
+                           max_workers: Optional[int], recipe: str, use_cache: bool,
+                           recipe_meta: RecipeMeta, include_columns: Optional[str],
+                           exclude_columns: Optional[str], limit: Optional[int]) -> bool:
+    """Handle the summarization stage.
+    
+    Args:
+        skip_summarize: Whether to skip summarization
+        output_dir: Output directory
+        prompt_path: Path to prompt template
+        max_workers: Maximum number of concurrent workers
+        recipe: Recipe name
+        use_cache: Whether to use cache
+        recipe_meta: RecipeMeta object containing recipe configuration
+        include_columns: Comma-separated list of columns to include
+        exclude_columns: Comma-separated list of columns to exclude
+        limit: Maximum number of conversations to process
+        
+    Returns:
+        bool: True if summarization stage completed successfully, False otherwise
+    """
     if skip_summarize:
         logger.info("Skipping summarization step")
+        return True
+    
+    logger.info("Starting summarization with OpenAI...")
+    
+    # Get Google Sheets configuration from recipe_meta
+    gsheet_config = None
+    if hasattr(recipe_meta, 'google_sheets') and recipe_meta.google_sheets:
+        sheet_id = getattr(recipe_meta.google_sheets, 'sheet_id', None)
+        worksheet = getattr(recipe_meta.google_sheets, 'worksheet_name', None)
+        if sheet_id and worksheet:
+            gsheet_config = {"sheet_id": sheet_id, "worksheet_name": worksheet}
+            logger.info(f"Configured Google Sheets integration from recipe configuration: {gsheet_config}")
+    
+    # Get behavior flags
+    skip_detailed_temporal_processing_for_recipe = False
+    if hasattr(recipe_meta, 'behavior_flags') and recipe_meta.behavior_flags:
+        skip_detailed_temporal_processing_for_recipe = getattr(
+            recipe_meta.behavior_flags, 'skip_detailed_temporal_processing', False)
+    
+    # Serialize RecipeMeta to dictionary
+    meta_dict = {}
+    if hasattr(recipe_meta, 'dict'):
+        # If it has a dict() method (Pydantic)
+        meta_dict = recipe_meta.dict()
     else:
-        logger.info("Starting summarization with OpenAI...")
-        
-        # Convert meta_yaml and gsheet_config to strings if they exist
-        gsheet_config_str = json.dumps(gsheet_config) if gsheet_config else None
-        meta_yaml_str = json.dumps(meta_yaml) if meta_yaml else None
-        
-        # Create options dictionary to override behavior flags
-        override_options = {
-            # If skip_temporal_flags is True, all temporal processing should be skipped
-            # This sets all sub-flags to True when the master flag is True
-            "skip_temporal_flags": skip_temporal_flags,
-            "skip_detailed_temporal": skip_detailed_temporal or skip_temporal_flags,
-            "skip_hours_minutes": skip_hours_minutes or skip_temporal_flags,
-            "skip_reactivation_flags": skip_reactivation_flags or skip_temporal_flags,
-            "skip_timestamps": skip_timestamps or skip_temporal_flags,
-            "skip_user_message_flag": skip_user_message_flag or skip_temporal_flags,
-            "skip_handoff_detection": skip_handoff_detection,
-            "skip_metadata_extraction": skip_metadata_extraction,
-            "skip_handoff_invitation": skip_handoff_invitation,
-            "skip_handoff_started": skip_handoff_started,
-            "skip_handoff_finalized": skip_handoff_finalized,
-            "skip_human_transfer": skip_human_transfer,
-            "skip_recovery_template_detection": skip_recovery_template_detection,
-            "skip_consecutive_templates_count": skip_consecutive_templates_count,
-            # Add limit option if provided
-            "limit": limit
-        }
-        
-        # Print the actual values of the flags for debugging
-        logger.info(f"Flag values for override_options in run_pipeline:")
-        logger.info(f"  - skip_temporal_flags: {skip_temporal_flags} (type: {type(skip_temporal_flags).__name__})")
-        logger.info(f"  - skip_detailed_temporal: {override_options['skip_detailed_temporal']}")
-        logger.info(f"  - skip_hours_minutes: {override_options['skip_hours_minutes']}")
-        logger.info(f"  - skip_reactivation_flags: {override_options['skip_reactivation_flags']}")
-        logger.info(f"  - skip_timestamps: {override_options['skip_timestamps']}")
-        logger.info(f"  - skip_user_message_flag: {override_options['skip_user_message_flag']}")
-        logger.info(f"  - skip_handoff_detection: {override_options['skip_handoff_detection']}")
-        logger.info(f"  - skip_metadata_extraction: {override_options['skip_metadata_extraction']}")
-        logger.info(f"  - skip_handoff_invitation: {override_options['skip_handoff_invitation']}")
-        logger.info(f"  - skip_handoff_started: {override_options['skip_handoff_started']}")
-        logger.info(f"  - skip_handoff_finalized: {override_options['skip_handoff_finalized']}")
-        logger.info(f"  - skip_human_transfer: {override_options['skip_human_transfer']}")
-        logger.info(f"  - skip_recovery_template_detection: {override_options['skip_recovery_template_detection']}")
-        logger.info(f"  - skip_consecutive_templates_count: {override_options['skip_consecutive_templates_count']}")
-        if limit:
-            logger.info(f"  - limit: {limit} (will only process {limit} conversations)")
-        
-        # Add options dictionary to meta_yaml
-        if meta_yaml is None:
-            meta_yaml = {}
-        meta_yaml["override_options"] = override_options
-        
-        # If columns are specified, add them to meta_yaml
-        if include_columns:
-            meta_yaml["include_columns"] = include_columns.split(",")
-        if exclude_columns:
-            meta_yaml["exclude_columns"] = exclude_columns.split(",")
-            
-        meta_yaml_str = json.dumps(meta_yaml)
-        
+        # Fallback manual serialization
+        logger.warning("RecipeMeta does not have dict() method, using manual serialization")
+        for attr in dir(recipe_meta):
+            if not attr.startswith('_') and not callable(getattr(recipe_meta, attr)):
+                meta_dict[attr] = getattr(recipe_meta, attr)
+    
+    # Add a flag to indicate this is a serialized RecipeMeta
+    meta_dict['__is_recipe_meta__'] = True
+    
+    # Add override options
+    meta_dict['override_options'] = {
+        'limit': limit,
+        'skip_detailed_temporal': skip_detailed_temporal_processing_for_recipe
+    }
+    
+    # Convert serialized config to JSON string
+    meta_config_str = json.dumps(meta_dict)
+    
+    # Convert gsheet_config to string if it exists
+    gsheet_config_str = json.dumps(gsheet_config) if gsheet_config else None
+    
+    # Prepare columns
+    include_cols = include_columns
+    exclude_cols = exclude_columns
+    
+    try:
+        # Call summarize with dictionary config and all necessary flags
         summarize(
             output_dir=output_dir,
             prompt_template_path=prompt_path,
@@ -353,9 +469,11 @@ def run_pipeline(
             recipe_name=recipe,
             use_cache=use_cache,
             gsheet_config=gsheet_config_str,
-            meta_config=meta_yaml_str,
+            meta_config=meta_config_str,  # Pass serialized RecipeMeta
+            include_columns=include_cols,
+            exclude_columns=exclude_cols,
             skip_detailed_temporal=skip_detailed_temporal_processing_for_recipe,
-            limit=limit  # Pass the limit parameter to the summarize function
+            limit=limit
         )
         logger.info("Summarization completed.")
         
@@ -367,6 +485,106 @@ def run_pipeline(
             format="both"
         )
         logger.info("Reports generated.")
+        return True
+    except Exception as e:
+        logger.error(f"Error in summarization step: {e}", exc_info=True)
+        return False
 
-    logger.info(f"Recipe '{recipe}' run complete. Results in {output_dir}")
-    typer.echo(f"Done! Results saved to {output_dir}") 
+@app.callback(invoke_without_command=True)
+def run_pipeline(
+    recipe: str = typer.Option(..., help="Recipe name (folder name under recipes/)"),
+    skip_redshift: bool = typer.Option(False, help="Skip fetching leads from Redshift"),
+    skip_bigquery: bool = typer.Option(False, help="Skip fetching conversations from BigQuery"),
+    skip_summarize: bool = typer.Option(False, help="Skip summarizing conversations"),
+    max_workers: Optional[int] = typer.Option(None, help="Max concurrent workers for OpenAI calls"),
+    output_dir: Optional[str] = typer.Option(None, help="Override base output directory"),
+    use_cached_redshift: bool = typer.Option(True, help="Use cached Redshift data if available"),
+    use_cache: bool = typer.Option(True, "--use-cache/--no-cache", help="Use summarization cache if available."),
+    ignore_redshift_marker: bool = typer.Option(False, "--ignore-redshift-marker", help="Ignore existing Redshift marker and run query even if already run today."),
+    skip_processors: Optional[List[str]] = typer.Option(None, "--skip-processor", help="List of processor class names to skip"),
+    run_only_processors: Optional[List[str]] = typer.Option(None, "--run-only-processor", help="List of processor class names to run exclusively"),
+    include_columns: Optional[str] = typer.Option(None, help="Comma-separated list of columns to include in the output"),
+    exclude_columns: Optional[str] = typer.Option(None, help="Comma-separated list of columns to exclude from the output"),
+    limit: Optional[int] = typer.Option(None, help="Limit the number of conversations to process (for testing)"),
+):
+    """Run the lead recovery pipeline."""
+    logger.info("Using GOOGLE_APPLICATION_CREDENTIALS: %s", os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"))
+    logger.info("Running as user: %s", os.environ.get("USER", "unknown"))
+    
+    # Override output directory if specified
+    if output_dir:
+        final_output_dir = Path(output_dir) / recipe
+    else:
+        final_output_dir = Path(settings.OUTPUT_DIR) / recipe
+    
+    logger.info(f"Using output directory: {final_output_dir}")
+    final_output_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Find recipe directory and load recipe configuration
+    recipe_dir = Path(settings.PROJECT_ROOT) / "recipes" / recipe
+    if not recipe_dir.is_dir():
+        msg = f"Recipe '{recipe}' not found in {recipe_dir.parent}"
+        logger.error(msg)
+        raise RecipeNotFoundError(msg)
+    
+    # Load and filter processors
+    recipe_meta = load_recipe_config(recipe, recipe_dir, skip_processors, run_only_processors)
+    
+    # Set up SQL and prompt paths
+    paths = setup_sql_and_prompt_paths(recipe_dir, recipe_meta)
+    redshift_sql_path = paths["redshift_sql_path"]
+    bigquery_sql_path = paths["bigquery_sql_path"]
+    prompt_path = paths["prompt_path"]
+    
+    # Final paths
+    leads_path = final_output_dir / "leads.csv"
+    
+    # Check if recipe uses CSV as lead source
+    uses_csv_source = (hasattr(recipe_meta, 'data_input') and 
+                      hasattr(recipe_meta.data_input, 'lead_source_type') and 
+                      recipe_meta.data_input.lead_source_type == 'csv')
+    
+    # Handle CSV lead source if needed
+    if uses_csv_source:
+        logger.info("Recipe uses CSV as lead source type - copying CSV leads file")
+        csv_success = handle_csv_leads(recipe_dir, recipe_meta, final_output_dir)
+        if not csv_success:
+            logger.error("Failed to copy CSV leads file, cannot continue")
+            raise typer.Exit(1)
+        # Skip Redshift since we're using CSV
+        skip_redshift = True
+    
+    # Handle Redshift stage
+    redshift_success = handle_redshift_stage(
+        recipe, skip_redshift, redshift_sql_path, 
+        ignore_redshift_marker, use_cached_redshift, 
+        leads_path, final_output_dir
+    )
+    
+    if not redshift_success and not skip_redshift:
+        logger.error("Redshift stage failed and not skipped, cannot continue")
+        raise typer.Exit(1)
+
+    # Handle BigQuery stage
+    bigquery_success = handle_bigquery_stage(skip_bigquery, final_output_dir, bigquery_sql_path)
+    
+    if not bigquery_success and not skip_bigquery:
+        logger.error("BigQuery stage failed and not skipped, cannot continue")
+        raise typer.Exit(1)
+
+    # Handle Summarize stage
+    summarize_success = handle_summarize_stage(
+        skip_summarize, final_output_dir, prompt_path, 
+        max_workers, recipe, use_cache, recipe_meta,
+        include_columns, exclude_columns, limit
+    )
+    
+    if not summarize_success and not skip_summarize:
+        logger.error("Summarize stage failed and not skipped, cannot continue")
+        raise typer.Exit(1)
+        
+    logger.info("Pipeline completed successfully")
+    
+    # Produce a summary report
+    if not skip_summarize:
+        report(output_dir=final_output_dir, recipe_name=recipe) 

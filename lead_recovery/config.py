@@ -1,5 +1,5 @@
 """
-Centralised application configuration using pydantic.
+Centralized application configuration using pydantic.
 """
 from __future__ import annotations
 
@@ -49,23 +49,22 @@ class Settings(BaseSettings):
     GOOGLE_CREDENTIALS_PATH: str | None = None
 
     # ------------------------------------------------------------------ #
-    # SQL file paths (can be overridden for testing) -------------------- #
+    # Project paths
+    # ------------------------------------------------------------------ #
     # We compute absolute paths so that CLI commands work regardless of the
     # shell's current working directory.
     PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent
 
-    # Default recipe (profiling_incomplete)
-    RS_SQL_PATH: Path = PROJECT_ROOT / "recipes" / "profiling_incomplete" / "redshift.sql"
-    BQ_SQL_PATH: Path = PROJECT_ROOT / "recipes" / "profiling_incomplete" / "bigquery.sql"
-
+    # ------------------------------------------------------------------ #
+    # BigQuery configuration
+    # ------------------------------------------------------------------ #
     # Optional: override the GCP project used by google‑cloud‑bigquery.
     # Leave unset to rely on Application‑Default credentials logic.
     BQ_PROJECT: str | None = None
 
     # ------------------------------------------------------------------ #
-    # Pipeline parameters
+    # Performance and processing parameters
     # ------------------------------------------------------------------ #
-    TIME_WINDOW_DAYS: int = 90
     BQ_BATCH_SIZE: int = 500
     BQ_MAX_CONCURRENT_QUERIES: int = 10
     OUTPUT_DIR: Path = Path("output_run")

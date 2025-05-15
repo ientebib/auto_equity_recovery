@@ -3,7 +3,7 @@
 
 # Get the absolute path to the project directory
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-AUTOMATION_SCRIPT="$PROJECT_DIR/automate_pipeline.py"
+AUTOMATION_SCRIPT="$PROJECT_DIR/lead_recovery/scripts/automate_pipeline.py"
 LOG_FILE="$PROJECT_DIR/cron_lead_recovery.log"
 
 # Check if the automation script exists and is executable
@@ -16,6 +16,9 @@ if [ ! -x "$AUTOMATION_SCRIPT" ]; then
     echo "Making automation script executable..."
     chmod +x "$AUTOMATION_SCRIPT"
 fi
+
+# Define the default recipe to run if not specified elsewhere
+DEFAULT_RECIPE="simulation_to_handoff"
 
 echo "Checking for existing cron jobs..."
 # Create a temporary crontab file
@@ -47,13 +50,13 @@ fi
 
 # Use more efficient */10 format, but only for the hours we want (10:30 through 18:30)
 # Start at 10:30
-echo "30 10 * * 1-5 cd $PROJECT_DIR && $PYTHON_PATH $AUTOMATION_SCRIPT >> $LOG_FILE 2>&1" >> "$TEMP_CRONTAB"
+echo "30 10 * * 1-5 cd $PROJECT_DIR && $PYTHON_PATH $AUTOMATION_SCRIPT $DEFAULT_RECIPE >> $LOG_FILE 2>&1" >> "$TEMP_CRONTAB"
 # 10:40 and 10:50
-echo "40,50 10 * * 1-5 cd $PROJECT_DIR && $PYTHON_PATH $AUTOMATION_SCRIPT >> $LOG_FILE 2>&1" >> "$TEMP_CRONTAB"
+echo "40,50 10 * * 1-5 cd $PROJECT_DIR && $PYTHON_PATH $AUTOMATION_SCRIPT $DEFAULT_RECIPE >> $LOG_FILE 2>&1" >> "$TEMP_CRONTAB"
 # Every 10 minutes from 11am to 6:20pm
-echo "*/10 11-18 * * 1-5 cd $PROJECT_DIR && $PYTHON_PATH $AUTOMATION_SCRIPT >> $LOG_FILE 2>&1" >> "$TEMP_CRONTAB"
+echo "*/10 11-18 * * 1-5 cd $PROJECT_DIR && $PYTHON_PATH $AUTOMATION_SCRIPT $DEFAULT_RECIPE >> $LOG_FILE 2>&1" >> "$TEMP_CRONTAB"
 # Final run at 6:30pm
-echo "30 18 * * 1-5 cd $PROJECT_DIR && $PYTHON_PATH $AUTOMATION_SCRIPT >> $LOG_FILE 2>&1" >> "$TEMP_CRONTAB"
+echo "30 18 * * 1-5 cd $PROJECT_DIR && $PYTHON_PATH $AUTOMATION_SCRIPT $DEFAULT_RECIPE >> $LOG_FILE 2>&1" >> "$TEMP_CRONTAB"
 
 # Install the new crontab
 crontab "$TEMP_CRONTAB"
@@ -64,6 +67,7 @@ rm "$TEMP_CRONTAB"
 
 echo ""
 echo "Done! The lead recovery pipeline will run on this schedule:"
+echo "- Running recipe: $DEFAULT_RECIPE"
 echo "- Starting at 10:30am"
 echo "- Every 10 minutes"
 echo "- Until 6:30pm" 

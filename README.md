@@ -8,6 +8,7 @@ This pipeline automates the analysis of lead data and customer conversations usi
 
 * **Data retrieval** from Redshift and BigQuery databases.
 * **AI-powered conversation summarization** with OpenAI's LLMs.
+* **Modular Python processors** for specific analysis tasks.
 * **Structured output** in CSV format.
 * **Recipe-based configuration** for different lead recovery scenarios.
 * **(Optional) Google Sheets integration** for specific recipes.
@@ -19,10 +20,138 @@ The pipeline follows this workflow:
 1. **(Optional) Fetch target leads** from Redshift based on criteria defined in the recipe's `redshift.sql`.
 2. **(Optional) Read target leads** from a `leads.csv` file if the Redshift step is skipped.
 3. **Fetch conversation history** for these leads from BigQuery using the recipe's `bigquery.sql`.
-4. **Analyze conversations** using OpenAI and the recipe's `prompt.txt` to extract structured insights (utilizing caching where possible).
-5. **Generate reports** in CSV format (`analysis.csv`, `ignored.csv`) within a timestamped directory in `output_run/<recipe_name>/`.
-6. **Update convenience links** (`latest.csv`, `latest_ignored.csv`) in the recipe's output directory.
-7. **(Conditional) Upload `latest.csv`** to a configured Google Sheet if the recipe has Google Sheets configuration.
+4. **Execute Python processors** that calculate features and analyze the conversation data.
+5. **Analyze conversations** using OpenAI and the recipe's `prompt.txt` to extract structured insights (utilizing caching where possible).
+6. **Generate reports** in CSV format (`analysis.csv`, `ignored.csv`) within a timestamped directory in `output_run/<recipe_name>/`.
+7. **Update convenience links** (`latest.csv`, `latest_ignored.csv`) in the recipe's output directory.
+8. **(Conditional) Upload `latest.csv`** to a configured Google Sheet if the recipe has Google Sheets configuration.
+
+## Quick Start
+
+### Running a Recipe
+
+The standard way to run any recipe is through the CLI:
+
+```bash
+python -m lead_recovery.cli.main run --recipe <recipe_name>
+```
+
+### Essential CLI Options
+
+* `--recipe <recipe_name>` (required): Specifies which recipe to run
+* `--skip-redshift`: Skip fetching data from Redshift (use existing leads.csv)
+* `--skip-bigquery`: Skip fetching conversations from BigQuery (use existing conversations.csv)
+* `--skip-summarize`: Skip LLM summarization (Python processors only)
+* `--limit <number>`: Process only the first N conversations (for testing)
+* `--skip-processor <ProcessorClassName>`: Skip specific processor(s)
+* `--run-only-processor <ProcessorClassName>`: Run only specific processor(s)
+
+For a complete guide to execution options, see [documentation/execution_guide.md](documentation/execution_guide.md).
+
+## Recipe Structure
+
+Recipes are defined in subdirectories under `recipes/` with the following key files:
+
+```
+recipes/your_recipe_name/
+├── meta.yml          # Core configuration (processors, LLM settings, output)
+├── prompt.txt        # LLM instructions 
+├── bigquery.sql      # Query to fetch conversation data
+└── redshift.sql      # Query to fetch target leads (optional)
+```
+
+For details on creating recipes, see [RECIPE_CREATION_GUIDE.md](RECIPE_CREATION_GUIDE.md).
+
+## Processor Architecture
+
+Lead Recovery uses a modular processor architecture to perform various analysis tasks:
+
+* **TemporalProcessor**: Calculates time-based features
+* **MessageMetadataProcessor**: Extracts message metadata
+* **HandoffProcessor**: Analyzes handoff processes
+* **TemplateDetectionProcessor**: Detects template messages
+* **ValidationProcessor**: Detects pre-validation questions
+* **ConversationStateProcessor**: Determines conversation state
+* **HumanTransferProcessor**: Detects human transfer events
+
+Processors are configured in each recipe's `meta.yml` file and can be controlled at runtime using CLI flags.
+
+For detailed processor documentation, see [documentation/python_processors_guide.md](documentation/python_processors_guide.md).
+
+## Output Control
+
+The `output_columns` section in a recipe's `meta.yml` determines which columns appear in the final CSV report, and in what order. This list should include any desired Python-generated columns.
+
+You can override output columns at runtime with CLI flags:
+* `--include-columns "col1,col2,col3"`: Include only these columns
+* `--exclude-columns "col1,col2,col3"`: Exclude these columns
+
+## Installation
+
+### Prerequisites
+
+* Python 3.10 or higher
+* Access credentials for:
+  * Redshift database (if not skipping Redshift steps)
+  * Google Cloud (BigQuery and potentially Google Sheets)
+  * OpenAI API
+* `gcloud` CLI installed and configured (for ADC authentication method)
+
+### Setup
+
+1. **Clone the repository:**
+   ```bash
+   git clone [repository-url]
+   cd lead_recovery_project
+   ```
+
+2. **Create and activate a virtual environment:**
+   ```bash
+   python -m venv fresh_env
+   source fresh_env/bin/activate  # On Windows: fresh_env\Scripts\activate
+   ```
+
+3. **Install dependencies (choose one method):**
+   
+   Using pip:
+   ```bash
+   pip install -r requirements.txt
+   pip install -e .  # Install package in development mode
+   ```
+   
+   Using Poetry (recommended):
+   ```bash
+   pip install poetry
+   poetry install
+   ```
+
+4. **Configure authentication:**
+
+   Create a `.env` file in the project root with the following variables (see `.env-sample` for an example):
+   ```
+   # OpenAI API key for summarization
+   OPENAI_API_KEY=your-openai-api-key
+
+   # Google service account credentials path
+   GOOGLE_CREDENTIALS_PATH=/path/to/your/google-credentials.json
+   # Or set the standard GOOGLE_APPLICATION_CREDENTIALS env var
+
+   # Redshift credentials
+   REDSHIFT_HOST=your-redshift-host.region.redshift.amazonaws.com
+   REDSHIFT_PORT=5439
+   REDSHIFT_DATABASE=your_database
+   REDSHIFT_USER=your_user
+   REDSHIFT_PASSWORD=your_password
+   ```
+
+## Documentation
+
+For more detailed information, refer to the following documentation:
+
+* [Execution Guide](documentation/execution_guide.md) - Complete guide to running recipes
+* [Python Processors Guide](documentation/python_processors_guide.md) - Documentation for all processors
+* [Recipe Creation Guide](RECIPE_CREATION_GUIDE.md) - How to create and configure recipes
+* [PROMPTING_AND_YAML_GUIDE.md](PROMPTING_AND_YAML_GUIDE.md) - Guide to LLM prompting and configuration
 
 ## Debugging Insights (Key Learnings)
 
@@ -197,225 +326,6 @@ To update all recipes at once:
 lead-recovery update-recipe-columns update-all
 ```
 
-## Installation
-
-### Prerequisites
-
-* Python 3.10 or higher
-* Access credentials for:
-  * Redshift database (if not skipping Redshift steps)
-  * Google Cloud (BigQuery and potentially Google Sheets)
-  * OpenAI API
-* `gcloud` CLI installed and configured (for ADC authentication method)
-
-### Setup
-
-1. **Clone the repository:**
-   ```bash
-   git clone [repository-url]
-   cd lead_recovery_project
-   ```
-
-2. **Create and activate a virtual environment:**
-   ```bash
-   python -m venv fresh_env
-   source fresh_env/bin/activate  # On Windows: fresh_env\Scripts\activate
-   ```
-
-3. **Install dependencies (choose one method):**
-   
-   Using pip:
-   ```bash
-   pip install -r requirements.txt
-   pip install -e .  # Install package in development mode
-   ```
-   
-   Using Poetry (recommended):
-   ```bash
-   pip install poetry
-   poetry install
-   ```
-
-4. **Configure authentication:**
-
-   Create a `.env` file in the project root with the following variables (see `.env-sample` for an example):
-   ```
-   # OpenAI API key for summarization
-   OPENAI_API_KEY=your-openai-api-key
-
-   # Google service account credentials path
-   GOOGLE_CREDENTIALS_PATH=/path/to/your/google-credentials.json
-   # Or set the standard GOOGLE_APPLICATION_CREDENTIALS env var
-
-   # Redshift credentials
-   REDSHIFT_HOST=your-redshift-host
-   REDSHIFT_DATABASE=your-redshift-database
-   REDSHIFT_USER=your-redshift-username
-   REDSHIFT_PASSWORD=your-redshift-password
-   ```
-
-## Usage
-
-### Run the Pipeline with the CLI
-
-The project has a modular CLI structure with the following commands:
-
-```bash
-# Full pipeline for a specific recipe
-lead-recovery run --recipe <recipe_name>
-
-# Individual steps
-lead-recovery fetch-leads --output-dir <dir>
-lead-recovery fetch-convos --output-dir <dir>
-lead-recovery summarize --output-dir <dir>
-lead-recovery report --output-dir <dir> --format html
-```
-
-Common options for the `run` command:
-* `--skip-redshift`: Skip fetching leads from Redshift
-* `--skip-bigquery`: Skip fetching conversations from BigQuery
-* `--skip-summarize`: Skip the OpenAI summarization step
-* `--output-dir PATH`: Set a custom output directory (defaults to project's `output_run/`)
-* `--max-workers INT`: Set the maximum number of concurrent workers for OpenAI calls
-* `--no-use-cached-redshift`: Force fetch from Redshift even if cached data exists
-* `--no-cache`: Disable summarization cache for forced refresh
-* `--ignore-redshift-marker`: Ignore existing Redshift marker and run query (even if already run today)
-
-### Common Command Examples
-
-**Most reliable way to run the recipe:**
-```bash
-python -m lead_recovery.cli.main run --recipe simulation_to_handoff
-```
-
-**Run with limited API calls (testing with fewer workers):**
-```bash
-python -m lead_recovery.cli.main run --recipe simulation_to_handoff --max-workers 2
-```
-
-**Run using cached conversations (skip BigQuery):**
-```bash
-python -m lead_recovery.cli.main run --recipe simulation_to_handoff --skip-bigquery
-```
-
-**Run using cached leads data (skip Redshift):**
-```bash
-python -m lead_recovery.cli.main run --recipe simulation_to_handoff --skip-redshift
-```
-
-**Run fresh analysis ignoring all caches:**
-```bash
-python -m lead_recovery.cli.main run --recipe simulation_to_handoff --no-cache --no-use-cached-redshift
-```
-
-**Run only data retrieval steps (skip LLM analysis):**
-```bash
-python -m lead_recovery.cli.main run --recipe simulation_to_handoff --skip-summarize
-```
-
-**Force reanalyze with OpenAI (only for conversations that changed):**
-```bash
-python -m lead_recovery.cli.main run --recipe simulation_to_handoff --skip-redshift --skip-bigquery --no-cache
-```
-
-**Force new Redshift query (even if already run today):**
-```bash
-python -m lead_recovery.cli.main run --recipe simulation_to_handoff --ignore-redshift-marker
-```
-
-**Skip specific Python flag calculations (e.g., topup template detection):**
-```bash
-python -m lead_recovery.cli.main run --recipe simulation_to_handoff --skip-topup-template-detection
-```
-
-### Run with Automation Script
-
-You can also use the automation script:
-
-```bash
-python automate_pipeline.py <recipe_name>
-```
-
-This script:
-1. Sets up the environment and credentials automatically
-2. Runs the specified recipe
-3. Creates a marker file to avoid re-querying Redshift on the same day
-4. Logs all activity to `cron_lead_recovery.log`
-
-## Recipes and Output Locations
-
-Recipes are configuration directories under `recipes/` that define:
-
-* `redshift.sql`: Query to fetch target leads from Redshift.
-* `bigquery.sql`: Query to fetch conversations from BigQuery.
-* `prompt.txt`: Instructions for the OpenAI model to analyze conversations.
-* `meta.yml`: Configuration including expected keys to extract and optional Google Sheets settings.
-
-### Customizing Output Columns
-
-You can customize which columns appear in your final output files by defining the `output_columns` list in your recipe's `meta.yml` file. The system will output only the columns you specify, in the exact order you define:
-
-```yaml
-# meta.yml output columns example
-output_columns:
-  # Core lead info 
-  - lead_id
-  - user_id
-  - name
-  - phone
-  
-  # Analysis data
-  - summary
-  - primary_stall_reason_code
-  - next_action_code
-  - suggested_message
-  
-  # Python-detected metadata
-  - last_message_sender
-  - last_user_message_text
-  - last_message_ts
-```
-
-Benefits of customizing output columns:
-* Remove technical fields like `conversation_digest` from user-facing reports
-* Ensure the most important fields appear first in spreadsheets
-* Create cleaner, more focused reports for different stakeholders
-
-### Output Locations
-
-When you run a recipe, the output is stored in:
-```
-output_run/<recipe_name>/
-```
-
-Inside each recipe's output directory, you'll find:
-* `latest.csv` - Always points to the most recent analysis results
-* `latest_ignored.csv` - Contains any leads that were filtered out
-* Time-stamped folders (e.g., `2025-05-06T14-30/`) - Contains that specific run's data
-* `cache.csv` - Stores cached results to avoid re-analyzing unchanged conversations
-
-### Google Sheets Integration
-
-**IMPORTANT:** Currently, only the `simulation_to_handoff` recipe automatically uploads to Google Sheets by default.
-
-The `latest.csv` file from this recipe is automatically uploaded to:
-* Sheet ID: `1466ljSang2OBqqgn6XWGVXUS2JQ7VPcbEJ6eYYG-WO8`
-* Worksheet: `perfAp-handoff`
-
-For other recipes, you can enable Google Sheets uploads by adding a `meta.yml` file to the recipe directory:
-
-```yaml
-google_sheets:
-  sheet_id: "your-sheet-id-here"
-  worksheet_name: "your-worksheet-name"
-expected_yaml_keys:
-  - key1
-  - key2
-  # ... other expected keys
-```
-
-Without this configuration, recipes will save data locally only, with no Google Sheets upload.
-
 ## Codebase Structure
 
 The project has been refactored for better maintainability and optimization:
@@ -488,143 +398,4 @@ The script includes (commented out) code to enforce business hours in Mexico Cit
 * **BigQuery Memory Errors:** If you encounter memory issues with large result sets, the system now streams results in chunks.
 
 * **Column Filtering Issues:** If your output is missing expected columns or has technical columns you don't want:
-  - Check the `output_columns` list in your recipe's `meta.yml` file
-  - Make sure the column names match exactly what's in your data
-  - Remember that column ordering in the output follows the exact order in `output_columns`
-
-* **Logs:** Check `cron_lead_recovery.log` for detailed execution information.
-
-## Development
-
-### Running Tests
-
-```bash
-# Run all tests
-pytest
-
-# Run with coverage
-pytest --cov=lead_recovery
-
-# Run specific test file
-pytest tests/test_cli.py
-```
-
-### Configuring and Running Recipes
-
-This guide explains how to set up and run new or existing recipes for the lead recovery pipeline.
-
-**1. Understanding Recipes**
-
-A recipe is a self-contained set of configurations that defines a specific lead recovery task. Each recipe is a directory located under `recipes/`. It tells the pipeline:
-*   Which leads to target.
-*   How to fetch their conversation history.
-*   How to interpret and summarize these conversations using AI.
-*   What specific information to extract.
-*   Which columns to include in the final output files.
-
-**2. Recipe Directory Structure**
-
-To create a new recipe, create a new directory inside the `recipes/` folder (e.g., `recipes/my_new_campaign`). Each recipe directory should contain the following files:
-
-*   **`redshift.sql`** (Optional)
-    *   **Purpose**: Defines the SQL query to fetch the initial list of target leads from your Redshift database.
-    *   **Output**: This query should produce a CSV file named `leads.csv` in the `output_run/<recipe_name>/` directory.
-    *   **Key Columns**: Minimally, it should output a column containing phone numbers. The pipeline internally expects this column to be named or aliased as `cleaned_phone` after normalization (typically 10-digit numbers).
-    *   **Skipping**: If you skip the Redshift step (e.g., using `--skip-redshift` or if this file is absent), you must manually provide a `leads.csv` file in `output_run/<recipe_name>/` with at least a `cleaned_phone` column.
-
-*   **`bigquery.sql`**
-    *   **Purpose**: Defines the SQL query to fetch conversation history for the leads identified by `redshift.sql` (or your provided `leads.csv`).
-    *   **Input**: The query uses a list of phone numbers (`@target_phone_numbers_list`) passed by the pipeline.
-    *   **CRUCIAL - Column Naming**: The column names you define in this SQL query *must* align with what the Python processing scripts in `lead_recovery/analysis.py` and `lead_recovery/summarizer.py` expect. Mismatches will lead to `KeyError` exceptions.
-        *   **Phone Number**: Ensure one column contains the phone number, typically aliased as `cleaned_phone_number` or `cleaned_phone`. The pipeline will attempt to normalize this.
-        *   **Message Content**: The actual text of the message is expected in a column named `message`. If your database uses a different name, alias it (e.g., `SELECT your_msg_column AS message, ...`).
-        *   **Sender**: A column indicating the sender (e.g., `user` or `kuna`) is usually named `msg_from`.
-        *   **Timestamp**: A message creation timestamp column, e.g., `creation_time`.
-    *   **Output**: This query populates `output_run/<recipe_name>/conversations.csv`.
-
-*   **`prompt.txt`**
-    *   **Purpose**: Contains the instructions and template for the AI model (OpenAI LLM) to analyze and summarize each conversation.
-    *   **Dynamic Variables**: You can use placeholders like `{HOY_ES}`, `{LAST_QUERY_TIMESTAMP}`, and `{conversation_text}` which will be injected by the pipeline.
-    *   **Output Format**: This prompt *must* instruct the AI to return its analysis in a **valid YAML format**. The keys used in this YAML output are critical.
-
-*   **`meta.yml`** (Highly Recommended)
-    *   **Purpose**: Provides metadata and configuration for the recipe.
-    *   **`expected_yaml_keys`**: This is a **critical** list. It must exactly match all the top-level keys that your `prompt.txt` instructs the AI to output in its YAML response. If these don't match, parsing will fail, or data will be incomplete.
-        ```yaml
-        expected_yaml_keys:
-          - lead_name
-          - summary
-          - current_engagement_status
-          # ... and all other keys from your prompt's YAML output
-        ```
-    *   **`output_columns`**: (New) Defines which columns to include in the final output and their order:
-        ```yaml
-        output_columns:
-          - lead_id
-          - summary
-          - next_action_code
-          # ... all columns you want in the output, in desired order
-        ```
-    *   **`google_sheets`** (Optional): If you want to upload the final `analysis.csv` to Google Sheets, configure it here:
-        ```yaml
-        google_sheets:
-          sheet_id: "your-google-sheet-id"
-          worksheet_name: "your-target-worksheet-name"
-        ```
-    *   **Other fields**: `name`, `description` for recipe identification.
-
-## Recipe Organization and Uniformity Guidelines
-
-### Maintaining Recipe Consistency
-
-To ensure consistency across all recipes and simplify maintenance:
-
-1. **Choose the Appropriate Recipe Type**:
-   - **Standard Recipes**: Use for most cases where LLM-based analysis is sufficient. Requires only SQL files, prompt.txt, and meta.yml.
-   - **Custom Recipes**: Use only when standard analysis can't handle your requirements. This adds analyzer.py for custom Python analysis.
-
-2. **Why Some Recipes Have Python Scripts**:
-   - **analyzer.py**: Used for custom recipes that require specific pattern detection or complex logic beyond what an LLM can do
-   - **__main__.py**: Used for recipes with completely custom workflows that deviate from the standard pipeline
-
-3. **Standardization Instructions for LLMs**:
-   - When modifying existing recipes: Maintain the current pattern (standard vs. custom)
-   - When creating new recipes: Default to standard recipes unless specific requirements necessitate custom code
-   - Always follow the structure in RECIPE_CREATION_GUIDE.md and RECIPE_TEMPLATES.md
-
-4. **Outputs Must Be Consistent**:
-   - All recipes MUST create results with a common filename pattern: `<recipe_name>_results.csv`
-   - All recipes MUST include a summary.txt with standard statistics
-   - All recipes MUST update a "latest.csv" symbolic link to the most recent results
-
-5. **Recipe Utilities**:
-   - For quick recipe creation: `python create_recipe.py your_recipe_name --template basic`
-   - For custom analyzers: `python create_recipe.py your_recipe_name --template analyzer`
-   - For fully custom recipes: `python create_recipe.py your_recipe_name --template custom`
-
-### Example Recipe Types
-
-**Standard Recipe (diana_originacion_mayo)**:
-- Uses built-in LLM analysis with prompt.txt
-- Standard meta.yml configuration
-- Simple pattern detection
-
-**Custom Recipe (sample_recipe)**:
-- Uses custom analyzer.py with Python logic
-- More complex pattern detection
-- Still follows standard output format
-
-## Documentation
-
-* [Main README](README.md) - This file, with overview of the entire project
-* [Recipe Creation Guide](RECIPE_CREATION_GUIDE.md) - Detailed guide for creating new recipes
-* [Recipe Templates](RECIPE_TEMPLATES.md) - Copy-pastable templates for recipe files
-* [Prompting & YAML Guide](PROMPTING_AND_YAML_GUIDE.md) - Guide for working with prompts and YAML
-
-## License
-
-[Specify your license information]
-
-## Contact
-
-Kavak
+  - Check the `

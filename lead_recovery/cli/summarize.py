@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 import asyncio
 import logging
+import json
 
 import typer
 
@@ -22,7 +23,9 @@ def summarize(
     recipe_name: Optional[str] = typer.Option(None, "--recipe-name", help="Recipe name for output files"),
     use_cache: bool = typer.Option(True, "--use-cache/--no-cache", help="Use summarization cache if available"),
     gsheet_config: Optional[str] = typer.Option(None, hidden=True, help="Internal use only"),
-    meta_config: Optional[str] = typer.Option(None, hidden=True, help="Internal use only"),
+    meta_config: Optional[str] = typer.Option(None, hidden=True, help="Serialized RecipeMeta from run.py"),
+    include_columns: Optional[str] = typer.Option(None, help="Comma-separated list of columns to include"),
+    exclude_columns: Optional[str] = typer.Option(None, help="Comma-separated list of columns to exclude"),
     skip_detailed_temporal: bool = typer.Option(False, hidden=True, help="Internal use: Skip detailed temporal calculations"),
     # Added: Allow expected keys to be passed directly (mainly for internal use by 'run')
     expected_yaml_keys_internal: Optional[List[str]] = typer.Option(None, hidden=True),
@@ -38,20 +41,24 @@ def summarize(
     
     if gsheet_config:
         try:
-            import json
             gsheet_config_dict = json.loads(gsheet_config)
         except Exception as e:
             logger.warning(f"Failed to parse gsheet_config as JSON: {e}")
     
+    # Parse meta_config as a JSON string
     if meta_config:
         try:
-            import json
             meta_config_dict = json.loads(meta_config)
+            # Check if this is a serialized RecipeMeta
+            if meta_config_dict.get('__is_recipe_meta__'):
+                logger.info(f"Using serialized RecipeMeta configuration")
         except Exception as e:
             logger.warning(f"Failed to parse meta_config as JSON: {e}")
 
     # Extract override options from meta_config_dict
-    override_options = meta_config_dict.get("override_options", {}) if meta_config_dict else {}
+    override_options = {}
+    if isinstance(meta_config_dict, dict) and "override_options" in meta_config_dict:
+        override_options = meta_config_dict.get("override_options", {})
     
     # Get specific skip flags from override_options, defaulting to False
     # These names must match the keys used in cli/run.py:override_options
@@ -75,9 +82,21 @@ def summarize(
     # Determine final limit (CLI option takes precedence)
     final_limit = limit if limit is not None else limit_from_meta
 
-    # Run the summarization step
-    from ..analysis import run_summarization_step
+    # Handle include/exclude columns
+    include_columns_list = None
+    exclude_columns_list = None
     
+    if include_columns:
+        include_columns_list = include_columns.split(",")
+    elif isinstance(meta_config_dict, dict) and "include_columns" in meta_config_dict:
+        include_columns_list = meta_config_dict.get("include_columns")
+    
+    if exclude_columns:
+        exclude_columns_list = exclude_columns.split(",")
+    elif isinstance(meta_config_dict, dict) and "exclude_columns" in meta_config_dict:
+        exclude_columns_list = meta_config_dict.get("exclude_columns")
+
+    # Run the summarization step
     try:
         try:
             loop = asyncio.get_event_loop()
@@ -94,6 +113,8 @@ def summarize(
                 use_cache=use_cache,
                 gsheet_config=gsheet_config_dict,
                 meta_config=meta_config_dict,
+                include_columns=include_columns_list,
+                exclude_columns=exclude_columns_list,
                 skip_detailed_temporal_calc=skip_detailed_temporal_from_meta,
                 skip_hours_minutes=skip_hours_minutes_from_meta,
                 skip_reactivation_flags=skip_reactivation_flags_from_meta,

@@ -22,6 +22,7 @@ A recipe is a self-contained configuration for analyzing a specific set of custo
 - SQL queries to fetch data
 - A prompt for AI analysis
 - Configuration metadata
+- Processor specifications
 - Output specification
 
 ## Folder Structure and Organization
@@ -35,7 +36,7 @@ lead_recovery_project/
 └── recipes/
     ├── your_recipe_name/        # Your new recipe goes here
     ├── simulation_to_handoff/   # Existing recipe
-    ├── diana_originacion_mayo/  # Existing recipe
+    ├── marzo_cohorts_live/      # Existing recipe
     └── ...
 ```
 
@@ -47,11 +48,9 @@ Each recipe folder MUST contain these specific files. The filenames can be defin
 ```
 recipes/your_recipe_name/
 ├── bigquery.sql       # REQUIRED: BigQuery conversation fetching query
-├── prompt.txt         # REQUIRED: LLM instructions (for standard recipes)
+├── prompt.txt         # REQUIRED: LLM instructions
 ├── meta.yml           # REQUIRED: Configuration and metadata
-├── redshift.sql       # OPTIONAL: Redshift lead fetching query
-├── analyzer.py        # OPTIONAL: Custom analysis logic (for custom recipes)
-└── __main__.py        # OPTIONAL: Custom processing script (for custom recipes)
+└── redshift.sql       # OPTIONAL: Redshift lead fetching query
 ```
 
 #### Option 2: Custom File Names (Specified in meta.yml)
@@ -60,17 +59,23 @@ recipes/your_recipe_name/
 ├── your_recipe_name_bigquery.sql    # REQUIRED: BigQuery query
 ├── your_recipe_name_prompt_v12.txt  # REQUIRED: LLM instructions
 ├── meta.yml                         # REQUIRED: Configuration (never renamed)
-├── your_recipe_name_redshift.sql    # OPTIONAL: Redshift query
-└── analyzer.py                      # OPTIONAL: Custom logic (never renamed)
+└── your_recipe_name_redshift.sql    # OPTIONAL: Redshift query
 ```
 
 **Important**: If using custom filenames (Option 2), you MUST specify them in meta.yml:
 
 ```yaml
 # In meta.yml
-redshift_sql: your_recipe_name_redshift.sql
-bigquery_sql: your_recipe_name_bigquery.sql
-prompt_file: your_recipe_name_prompt_v12.txt
+recipe_name: "your_recipe_name"
+version: "2.0"
+description: "Description of what this recipe analyzes"
+
+data_input:
+  lead_source_type: redshift  # Options: redshift, bigquery, csv
+  redshift_config:
+    sql_file: "your_recipe_name_redshift.sql"
+  bigquery_config:
+    sql_file: "your_recipe_name_bigquery.sql"
 ```
 
 **Note**: The simulation_to_handoff recipe (our most robust recipe) uses Option 2 with custom filenames specified in meta.yml.
@@ -192,31 +197,74 @@ suggested_message: A personalized message to re-engage the customer
 Ensure all fields are present and accurately represent the conversation.
 ```
 
-**CRITICAL:** The fields in the YAML block must exactly match those in `meta.yml` -> `expected_yaml_keys`.
+**CRITICAL:** The fields in the YAML block must exactly match those in `meta.yml` -> `llm_config.expected_llm_keys`.
 
 **IMPORTANT:** Use placeholders like `{HOY_ES}`, `{LAST_QUERY_TIMESTAMP}`, and `{conversation_text}` which will be filled by the pipeline.
 
 ### 2.4. `meta.yml` (REQUIRED)
 
-This file contains configuration for the recipe.
+This file contains configuration for the recipe using the standardized Pydantic schema.
 
 ```yaml
 # File: recipes/your_recipe_name/meta.yml
 
-name: "Your Recipe Name"
+recipe_name: "your_recipe_name"
+version: "2.0"
 description: "Description of what this recipe analyzes"
-version: "1.0"
 
-# CRITICAL: These MUST match exactly the fields in your prompt.txt YAML output
-expected_yaml_keys:
-  - lead_name
-  - summary
-  - current_engagement_status
-  - primary_stall_reason_code
-  - next_action_code
-  - suggested_message
+# Data input configuration
+data_input:
+  lead_source_type: redshift  # Options: redshift, bigquery, csv
+  redshift_config:
+    sql_file: "redshift.sql"  # Required if lead_source_type is redshift
+  # OR
+  bigquery_config:
+    sql_file: "bigquery.sql"  # Required if lead_source_type is bigquery
+  # OR
+  csv_config:
+    csv_file: "leads.csv"     # Required if lead_source_type is csv
 
-# Define which columns appear in output files and their order
+# LLM Configuration
+llm_config:
+  prompt_file: "prompt.txt"
+  # CRITICAL: These MUST match exactly the fields in your prompt.txt YAML output
+  expected_llm_keys:
+    lead_name:
+      description: "Full name of the customer"
+      type: str
+    summary:
+      description: "Brief summary of the conversation"
+      type: str
+    current_engagement_status:
+      description: "Current engagement status of the lead"
+      type: str
+      enum_values: [ENGAGED, STALLED, DISENGAGED]
+    primary_stall_reason_code:
+      description: "Primary reason the lead stalled"
+      type: str
+      enum_values: [NO_RESPONSE, TECHNICAL_ISSUE, CHANGED_MIND, FOUND_ALTERNATIVE, OTHER]
+    next_action_code:
+      description: "Next action to take for this lead"
+      type: str
+      enum_values: [FOLLOW_UP, OFFER_HELP, SUGGEST_ALTERNATIVE, CLOSE_LEAD]
+    suggested_message:
+      description: "Personalized re-engagement message"
+      type: str
+  # Optional: Python processor outputs to include in LLM prompt
+  context_keys_from_python: []
+
+# Python Processors Configuration
+python_processors:
+  - module: "lead_recovery.processors.temporal.TemporalProcessor"
+    params:
+      timezone: "America/Mexico_City"
+  - module: "lead_recovery.processors.metadata.MessageMetadataProcessor"
+    params:
+      max_message_length: 150
+  - module: "lead_recovery.processors.handoff.HandoffProcessor"
+    params: {}
+
+# Output Columns (defines what appears in the final CSV)
 output_columns:
   - cleaned_phone
   - lead_name
@@ -225,180 +273,100 @@ output_columns:
   - primary_stall_reason_code
   - next_action_code
   - suggested_message
-  - last_message_sender
-  - last_message_ts
-
-# Optional: For enum validation (ensures values match expected options)
-validation_enums:
-  primary_stall_reason_code:
-    - NO_RESPONSE
-    - TECHNICAL_ISSUE
-    - CHANGED_MIND
-    - FOUND_ALTERNATIVE
-    - OTHER
-  next_action_code:
-    - FOLLOW_UP
-    - OFFER_HELP
-    - SUGGEST_ALTERNATIVE
-    - CLOSE_LEAD
-
-# Optional: Google Sheets integration
-google_sheets:
-  sheet_id: "your-google-sheet-id"
-  worksheet_name: "your-target-worksheet-name"
+  - HOURS_MINUTES_SINCE_LAST_MESSAGE
+  - handoff_invitation_detected
+  - handoff_response
 ```
 
-**CRITICAL:** The `expected_yaml_keys` list MUST exactly match all the fields your prompt instructs the AI to output.
+## 3. Running Your Recipe
 
-## 3. Authentication Setup
-
-### 3.1. BigQuery Authentication
-
-The project uses Google Cloud's Application Default Credentials (ADC) mechanism. 
-
-**IMPORTANT:** Use `BigQueryClient` from `lead_recovery.db_clients` instead of creating your own client!
-
-```python
-# CORRECT WAY:
-from lead_recovery.db_clients import BigQueryClient
-client = BigQueryClient()
-df = client.query(query, params=query_params)
-
-# WRONG WAY - will cause authentication issues:
-from google.cloud import bigquery
-client = bigquery.Client()  # DON'T do this!
-```
-
-If you encounter authentication errors:
-
-1. Ensure `GOOGLE_APPLICATION_CREDENTIALS` environment variable is set to your service account JSON path.
-2. Or use the `GOOGLE_CREDENTIALS_PATH` in your `.env` file.
-3. Check the service account has BigQuery permissions.
-
-## 4. Running Your Recipe
-
-### 4.1. Command for Running
-
-Always use this command format for reliability:
+Use the standard CLI command to run your recipe:
 
 ```bash
 python -m lead_recovery.cli.main run --recipe your_recipe_name
 ```
 
-### 4.2. Important Options
+### Common CLI Options
 
-- `--skip-redshift`: Skip fetching from Redshift (use existing leads.csv)
-- `--skip-bigquery`: Skip fetching from BigQuery (use existing conversations)
-- `--skip-summarize`: Skip LLM analysis (data fetch only)
-- `--no-use-cache`: Force re-analysis with OpenAI (don't use summarization cache)
-- `--max-workers 5`: Limit concurrent API calls (lower = slower but more reliable)
+- **Skip data fetching**: `--skip-redshift --skip-bigquery` (uses existing data files)
+- **Skip LLM summarization**: `--skip-summarize` (runs only Python processors)
+- **Limit processing**: `--limit 10` (processes only the first 10 conversations)
+- **Control processors**: `--skip-processor TemporalProcessor` or `--run-only-processor HandoffProcessor`
 
-## 5. Understanding the Output
-
-All output is stored in `output_run/your_recipe_name/`:
-
-- Timestamped folders (e.g., `2025-05-09T14-30/`):
-  - `analysis.csv`: Main results file
-  - `ignored.csv`: (Optional) Filtered/error records
-- `latest.csv`: Symlink to most recent analysis.csv
-- `latest_ignored.csv`: Symlink to most recent ignored.csv
-- `leads.csv`: Phone numbers being analyzed
-- `conversations.csv`: Raw conversation data from BigQuery
-
-## 6. Debugging Common Issues
-
-### 6.1. BigQuery Authentication Errors
-
-**Error:** `Access Denied: Project m-infra: User does not have bigquery.jobs.create permission`
-
-**Solution:**
-1. Always use `lead_recovery.db_clients.BigQueryClient()`
-2. Set `GOOGLE_APPLICATION_CREDENTIALS` to your service account JSON file
-3. Run with proper authentication: `GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json python -m lead_recovery.cli.main run --recipe your_recipe_name`
-
-### 6.2. Missing or Incorrect Columns
-
-**Error:** `KeyError: 'cleaned_phone_number'` or similar
-
-**Solution:**
-1. Check your SQL query columns match what the code expects
-2. Make sure column names match: `cleaned_phone_number`, `msg_from`, `message`, `creation_time`
-3. Use SQL aliases if needed: `SELECT your_column AS cleaned_phone_number, ...`
-
-### 6.3. YAML Parsing Errors
-
-**Error:** Missing keys in results or validation errors
-
-**Solution:**
-1. Ensure `expected_yaml_keys` in `meta.yml` matches exactly what your prompt asks the AI to produce
-2. Verify your prompt instructions are clear about required YAML format
-3. Check that validation_enums values match what your prompt expects
-
-## 7. Example Recipe
-
-For reference, see existing recipes:
-- `recipes/simulation_to_handoff/`: Complex recipe with Google Sheets integration
-- `recipes/diana_originacion_mayo/`: Simple recipe for template detection 
-
-## 8. Testing Your Recipe
-
-Before running on a large dataset:
-
-1. Test with a small sample of phone numbers (10-20)
-2. Check the BigQuery SQL results manually before processing
-3. Verify AI prompt outputs expected YAML structure
-4. Examine final CSV output to ensure all fields are present
-
-## 9. Using the Recipe Generator Script
-
-The easiest way to create a new recipe is to use the provided `create_recipe.py` script, which will automatically create all required files with the proper structure:
+For a complete list of CLI options, use:
 
 ```bash
-# Basic recipe (using LLM with prompt.txt)
-python create_recipe.py your_recipe_name --description "Your recipe description" --author "Your Name"
-
-# Custom recipe with analyzer.py (Python-based analysis)
-python create_recipe.py your_recipe_name --template analyzer --description "Description" --author "Your Name"
-
-# Fully custom recipe with analyzer.py and __main__.py
-python create_recipe.py your_recipe_name --template custom --description "Description" --author "Your Name"
+python -m lead_recovery.cli.main run --help
 ```
 
-The script will:
-1. Create the recipe directory: `recipes/your_recipe_name/`
-2. Generate all required files with correct templates
-3. Properly format placeholders and variables
-4. Print detailed instructions for running the recipe
+For more detailed information about running recipes, see the comprehensive [Execution Guide](documentation/execution_guide.md).
 
-### Generator Output
+## 4. Debugging and Troubleshooting
 
-After running the script, you'll see:
-- The location of all created files
-- Step-by-step instructions for using the recipe
-- Where to find the output files
+### Checking Recipe Validity
 
-For example:
-```
-Recipe 'test_recipe' created successfully with 6 files!
-To run this recipe: python -m lead_recovery.cli.main run --recipe test_recipe
+You can test that your recipe loads correctly without running it:
 
-Complete Recipe Workflow:
-1. Recipe files created in:
-   recipes/test_recipe/
-2. When you run the recipe, it will:
-   a. Query Redshift using recipes/test_recipe/redshift.sql to get leads
-   b. Save leads to output_run/test_recipe/leads.csv
-3. The recipe will then:
-   a. Query BigQuery using recipes/test_recipe/bigquery.sql for conversations
-   b. Analyze conversations using prompt.txt (LLM)
-   c. Generate results in output_run/test_recipe/<timestamp>/test_recipe_results.csv
-   d. Create a 'latest.csv' symbolic link to the most recent results
-
-To check the results after running:
-1. Look in: output_run/test_recipe/<timestamp>/
-2. Or use the convenience link: output_run/test_recipe/latest.csv
+```bash
+python test_all_recipes.py
 ```
 
-## Conclusion
+### Common Issues
 
-Following this guide will help you create reliable recipes that consistently produce the expected results. Always verify your SQL queries and prompt instructions to ensure they match the expected column names and output format. 
+1. **Meta.yml Validation Fails**:
+   - Check for required fields and correct data types
+   - Ensure all enum_values are properly defined
+   - Verify that the python_processors module paths are correct
+
+2. **Missing Data or Empty Results**:
+   - Verify that your SQL queries return the expected data
+   - Check if caching is causing stale results (`--no-cache` flag)
+
+3. **Processor Errors**:
+   - Test individual processors using `--run-only-processor`
+   - Check that processor parameters in meta.yml are valid
+
+### Best Practices
+
+1. **Start Small**: Begin with a small limit (`--limit 5`) to test your recipe
+2. **Test Incrementally**: Add one processor at a time and test functionality
+3. **Validate LLM Output**: Ensure the LLM output matches your expected_llm_keys
+4. **Examine Raw Data**: Check leads.csv and conversations.csv to verify input data
+5. **Review Console Output**: The CLI provides detailed logging about each step
+
+## 5. Advanced Features
+
+### Context Keys From Python Processors
+
+You can pass processor results to the LLM prompt using `context_keys_from_python`:
+
+```yaml
+llm_config:
+  prompt_file: "prompt.txt"
+  expected_llm_keys:
+    # ...
+  context_keys_from_python: ["handoff_invitation_detected", "handoff_response"]
+```
+
+Then in your prompt.txt, use them as variables:
+
+```
+Handoff invitation: {handoff_invitation_detected}
+Response to handoff: {handoff_response}
+```
+
+### Custom Output Columns
+
+The `output_columns` field in meta.yml controls exactly which columns appear in the final CSV output, and in what order. It should include:
+
+- Columns from lead data (e.g., `cleaned_phone`, `Asset ID`)
+- LLM-generated columns (e.g., `summary`, `next_action_code`)
+- Python processor-generated columns (e.g., `handoff_invitation_detected`)
+
+### Selective Column Processing
+
+You can override the output_columns setting at runtime with the CLI:
+
+```bash
+python -m lead_recovery.cli.main run --recipe your_recipe_name --include-columns "cleaned_phone,summary,next_action_code"
+``` 

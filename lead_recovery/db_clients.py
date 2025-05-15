@@ -149,6 +149,41 @@ class RedshiftClient:
         except Exception as e:
             logger.exception("Redshift query failed")
             raise DatabaseQueryError(f"Redshift query failed: {e}") from e
+            
+    def query_from_file(self, file_path: Path | str, params: Dict[str, Any] | None = None) -> pd.DataFrame:
+        """Execute a SQL query from a file with optional parameters and return the results as a DataFrame.
+        
+        Args:
+            file_path: Path to the SQL file
+            params: Optional dictionary of parameters for the query
+            
+        Returns:
+            pandas DataFrame with query results
+            
+        Raises:
+            FileNotFoundError: If the SQL file doesn't exist
+            DatabaseConnectionError: If connection to Redshift fails
+            DatabaseQueryError: If the query execution fails
+        """
+        from .utils import load_sql_file
+        
+        try:
+            # Load SQL from file
+            sql = load_sql_file(file_path)
+            
+            # Execute the query
+            return self.query(sql, params)
+        except FileNotFoundError:
+            # Re-raise file not found errors directly
+            raise
+        except IOError as e:
+            # Wrap IO errors for context
+            logger.error(f"Error reading SQL file: {e}")
+            raise DatabaseQueryError(f"Error reading SQL file: {e}") from e
+        except Exception as e:
+            # Wrap any other exceptions
+            logger.error(f"Error executing SQL from file {file_path}: {e}")
+            raise DatabaseQueryError(f"Error executing SQL from file {file_path}: {e}") from e
 
 
 class BigQueryClient:

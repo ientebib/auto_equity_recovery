@@ -2,6 +2,10 @@
 Custom exception classes for the lead recovery pipeline.
 """
 
+class AutoEquityRecoveryError(Exception):
+    """Base exception for this application."""
+    pass
+
 class LeadRecoveryError(Exception):
     """Base class for exceptions in this application."""
     pass
@@ -9,6 +13,10 @@ class LeadRecoveryError(Exception):
 # -- Configuration Errors --
 class ConfigurationError(LeadRecoveryError):
     """Exception related to configuration issues (e.g., missing settings, invalid recipe)."""
+    pass
+
+class RecipeConfigurationError(ConfigurationError):
+    """Indicates an error in a recipe's configuration (e.g., meta.yml)."""
     pass
 
 class RecipeNotFoundError(ConfigurationError, FileNotFoundError):

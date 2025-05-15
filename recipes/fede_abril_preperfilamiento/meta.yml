@@ -1,35 +1,49 @@
-# Basic metadata for the fede_abril_preperfilamiento recipe
-name: "fede_abril_preperfilamiento"
+recipe_name: "fede_abril_preperfilamiento"
+version: "1.0"
 description: "Recipe for analyzing lead engagement in the active Fede Abril Re-engagement campaign, using leads.csv as input."
-dashboard_title: "Fede Abril Re-engagement Campaign Analysis (CSV Input)"
-summary_format: yaml
 
-# Define input CSV file relative to the recipe directory
-input_csv_file: leads.csv
+# Data Input Configuration
+data_input:
+  lead_source_type: csv
+  csv_config:
+    csv_file: "leads.csv"
+  conversation_sql_file_bigquery: "bigquery.sql"
 
-# Explicitly define SQL filenames (even if default)
-redshift_sql: redshift.sql # Required, but skipped via CLI flag
-bigquery_sql: bigquery.sql
-prompt_file: prompt.txt
+# LLM Configuration
+llm_config:
+  prompt_file: "prompt.txt"
+  expected_llm_keys:
+    lead_name:
+      description: "Name of the lead extracted from conversation."
+      type: str
+    summary:
+      description: "Estado + acción summary."
+      type: str
+    current_engagement_status:
+      description: "Current engagement status of the lead."
+      type: str
+    follow_up_attempts:
+      description: "Number of follow-up attempts."
+      type: int
+    next_action_code:
+      description: "Code indicating next action to take."
+      type: str
+    next_action_context:
+      description: "Context for next action."
+      type: str
+    suggested_message_es:
+      description: "Suggested message in Spanish."
+      type: str
+  context_keys_from_python: []
 
-# Define the keys expected from the OpenAI prompt's YAML output
-# Derived from the updated prompt.txt for engagement analysis.
-expected_yaml_keys:
-  - lead_name
-  - summary                 # Estado + acción
-  - current_engagement_status
-  - follow_up_attempts
-  # Following fields are now provided by Python, not from LLM output
-  # - last_message_sender
-  # - last_user_message_text
-  # - last_kuna_message_text
-  - next_action_code
-  - next_action_context
-  - suggested_message_es
-  # - transfer_context_analysis # Removed: Prompt indicates this is added by the system
+# Python Processors
+python_processors:
+  - module: "lead_recovery.processors.metadata.MessageMetadataProcessor"
+    params:
+      max_message_length: 150
+  - module: "lead_recovery.processors.handoff.HandoffProcessor"
+    params: {}
 
-# Define the columns to include in the final output report
-# Assumes 'cleaned_phone' is a column in leads.csv
 output_columns:
   - cleaned_phone
   - lead_name
@@ -43,35 +57,9 @@ output_columns:
   - next_action_code
   - next_action_context
   - suggested_message_es
-  - transfer_context_analysis # Note: Keeping this in output even if not from LLM
-  # Add handoff related columns
+  - transfer_context_analysis
   - handoff_invitation_detected
   - handoff_response
   - handoff_finalized
-
-# Python Flags Configuration (Added default - adjust as needed)
-python_flags:
-  # Temporal flags
-  skip_temporal_flags: true
-  skip_detailed_temporal: true
-  skip_hours_minutes: true
-  skip_reactivation_flags: true
-  skip_timestamps: true
-  skip_user_message_flag: true
-  
-  # Message metadata - Enable this as columns are in output_columns
-  skip_metadata_extraction: false 
-  
-  # Handoff detection
-  skip_handoff_detection: false
-  skip_handoff_invitation: false
-  skip_handoff_started: false
-  skip_handoff_finalized: false
-  
-  # Other detections
-  skip_human_transfer: true
-  skip_recovery_template_detection: true
-  skip_topup_template_detection: true
-  skip_consecutive_templates_count: true
 
 # --- End of file --- 

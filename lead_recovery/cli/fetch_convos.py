@@ -1,21 +1,23 @@
-"""CLI command for fetching conversations from BigQuery."""
-from typing import Optional, List
+"""CLI command for fetching WhatsApp conversations from BigQuery."""
 from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor
+import logging
 import threading
 import csv
-import logging
+from typing import List, Optional
 from queue import Queue, Empty as QueueEmpty
+from concurrent.futures import ThreadPoolExecutor
+from tqdm import tqdm
 
 import typer
 import pandas as pd
-from tqdm import tqdm
-from google.cloud.bigquery import ArrayQueryParameter, QueryJobConfig
 
 from ..config import settings
 from ..db_clients import BigQueryClient
 from ..utils import load_sql_file
 from ..reporting import to_csv
+
+# BigQuery imports used directly
+from google.cloud.bigquery import QueryJobConfig, ArrayQueryParameter
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +27,7 @@ app = typer.Typer()
 def fetch_convos(
     batch_size: int = typer.Option(settings.BQ_BATCH_SIZE, "--batch-size", help="Number of phone numbers per BigQuery request."),
     output_dir: Path = typer.Option(settings.OUTPUT_DIR, "--output-dir"),
+    sql_file: Optional[Path] = typer.Option(None, "--sql-file", help="Path to SQL file for querying conversations"),
 ):
     """Fetch WhatsApp conversation history for all target leads."""
     # Ensure output directory exists
@@ -35,6 +38,24 @@ def fetch_convos(
     if not leads_path.is_file():
         typer.echo("Leads CSV not found. Run fetch-leads first.")
         raise typer.Exit(1)
+
+    # Use provided SQL file or try to find a default in recipe dir
+    if sql_file is None:
+        # Look in the output_dir for bigquery.sql (assuming recipe structure)
+        recipe_dir = output_dir
+        if "output_run" in str(output_dir):
+            # If in the output_run dir, try to find the corresponding recipe
+            recipe_name = output_dir.name
+            recipe_dir = settings.PROJECT_ROOT / "recipes" / recipe_name
+            
+        sql_file = recipe_dir / "bigquery.sql"
+        logger.info(f"No SQL file provided, looking for {sql_file}")
+    
+    if not sql_file.exists():
+        logger.error(f"SQL file not found: {sql_file}")
+        raise typer.Exit(1)
+        
+    logger.info(f"Using SQL file: {sql_file}")
 
     # Direct reading of CSV to extract phone numbers, bypassing pandas completely
     phones = []
@@ -59,7 +80,7 @@ def fetch_convos(
 
     # Initialize BigQuery client and load SQL
     bq_client = BigQueryClient()
-    sql_template = load_sql_file(settings.BQ_SQL_PATH)
+    sql_template = load_sql_file(sql_file)
     convos_csv_path = output_dir / "conversations.csv"
 
     # Chunk phone numbers for batch processing

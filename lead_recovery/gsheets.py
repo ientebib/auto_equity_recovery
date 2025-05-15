@@ -19,16 +19,17 @@ from .exceptions import ConfigurationError
 logger = logging.getLogger(__name__)
 
 def upload_to_google_sheets(csv_path: Path, sheet_id: str, worksheet_name: str, credentials_path: str = None):
-    """Uploads the content of a CSV file to a specified Google Sheet worksheet.
+    """Uploads the content of a CSV or JSON file to a specified Google Sheet worksheet.
     
     Args:
-        csv_path: Path to the CSV file to upload
+        csv_path: Path to the CSV or JSON file to upload
         sheet_id: Google Sheet ID
         worksheet_name: Name of the worksheet to upload to
         credentials_path: Path to the Google service account credentials JSON file.
                          If None, will try to use settings.GOOGLE_CREDENTIALS_PATH
     """
-    logger.info(f"Attempting to upload {csv_path.name} to Google Sheet ID {sheet_id}, worksheet '{worksheet_name}'")
+    file_path = Path(csv_path)
+    logger.info(f"Attempting to upload {file_path.name} to Google Sheet ID {sheet_id}, worksheet '{worksheet_name}'")
     
     # Use credentials_path if provided, otherwise use settings
     if credentials_path is None:
@@ -58,8 +59,25 @@ def upload_to_google_sheets(csv_path: Path, sheet_id: str, worksheet_name: str, 
             # Consider adding rows/cols based on expected data size if needed
             worksheet = spreadsheet.add_worksheet(title=worksheet_name, rows="100", cols="20") 
 
-        # Read CSV data
-        df = pd.read_csv(csv_path)
+        # Determine file type from extension and load appropriately
+        file_extension = file_path.suffix.lower()
+        
+        if file_extension == '.json':
+            import json
+            logger.info(f"Loading JSON data from {file_path}")
+            with open(file_path, 'r', encoding='utf-8') as json_file:
+                data = json.load(json_file)
+                # Convert JSON to DataFrame (assuming JSON is in records format)
+                if isinstance(data, list):
+                    df = pd.DataFrame(data)
+                else:
+                    # If it's a single object, wrap it in a list
+                    df = pd.DataFrame([data])
+        else:
+            # Default is CSV
+            logger.info(f"Loading CSV data from {file_path}")
+            df = pd.read_csv(file_path)
+            
         # Replace NaN/NaT with empty strings for Sheets compatibility
         df = df.fillna('').astype(str)
 
@@ -74,7 +92,7 @@ def upload_to_google_sheets(csv_path: Path, sheet_id: str, worksheet_name: str, 
         return True
 
     except FileNotFoundError:
-        logger.error(f"Service account key file not found at: {credentials_path}")
+        logger.error(f"File not found at: {file_path}")
         raise
     except gspread.exceptions.APIError as e:
         logger.error(f"Google Sheets API Error: {e}")

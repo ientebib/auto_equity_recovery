@@ -1,0 +1,286 @@
+# Python Processors Guide
+
+This guide explains the Python processor system for the Lead Recovery project. Processors are modular components that analyze lead and conversation data, generating features that can be used in later pipeline stages including LLM analysis.
+
+## Table of Contents
+
+- [BaseProcessor Interface](#baseprocessor-interface)
+- [Creating Custom Processors](#creating-custom-processors)
+- [Built-in Processors](#built-in-processors)
+  - [TemporalProcessor](#temporalprocessor)
+  - [MessageMetadataProcessor](#messagemetadataprocessor)
+  - [HandoffProcessor](#handoffprocessor)
+  - [TemplateDetectionProcessor](#templatedetectionprocessor)
+  - [ValidationProcessor](#validationprocessor)
+  - [ConversationStateProcessor](#conversationstateprocessor)
+  - [HumanTransferProcessor](#humantransferprocessor)
+- [Configuring Processors in meta.yml](#configuring-processors-in-metayml)
+- [Processor Execution and Control](#processor-execution-and-control)
+- [Troubleshooting Processors](#troubleshooting-processors)
+
+## BaseProcessor Interface
+
+The `BaseProcessor` abstract class serves as the foundation for all processors in the system. It defines a standard contract that ensures consistent behavior across all processors.
+
+### Key Components
+
+- **GENERATED_COLUMNS attribute**: Each processor must declare a class-level list of column names that it will generate. This enables validation and documentation of outputs.
+
+- **\_\_init\_\_ method**: Initializes the processor with recipe configuration, processor-specific parameters, and optional global configuration.
+
+- **_validate_params method**: Abstract method that each processor must implement to validate its specific parameters.
+
+- **process method**: The main method that performs the actual processing. Takes lead data, conversation data, and existing results as inputs, and returns a dictionary of results.
+
+### Example
+
+```python
+from typing import Dict, Any, List, Optional
+import pandas as pd
+from lead_recovery.processors.base import BaseProcessor
+
+class ExampleProcessor(BaseProcessor):
+    """Example processor that demonstrates the BaseProcessor interface."""
+    
+    GENERATED_COLUMNS = [
+        "example_column1", 
+        "example_column2"
+    ]
+    
+    def _validate_params(self):
+        """Validate processor-specific parameters."""
+        known_params = {"example_param1", "example_param2"}
+        for param in self.params:
+            if param not in known_params:
+                raise ValueError(f"Unknown parameter '{param}' for {self.__class__.__name__}")
+    
+    def process(self, 
+                lead_data: pd.Series, 
+                conversation_data: Optional[pd.DataFrame],
+                existing_results: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Process lead and conversation data.
+        
+        Args:
+            lead_data: Series containing lead information
+            conversation_data: DataFrame with conversation messages
+            existing_results: Dictionary of results from previous processors
+            
+        Returns:
+            Dictionary of calculated results
+        """
+        # Initialize results
+        results = {
+            "example_column1": None,
+            "example_column2": None
+        }
+        
+        # Get parameters with defaults
+        param1 = self.params.get("example_param1", "default_value")
+        
+        # Process data and generate results
+        # ...
+        
+        return results
+```
+
+## Creating Custom Processors
+
+To create a new processor, follow these steps:
+
+1. **Create a new Python file** in the `lead_recovery/processors/` directory.
+
+2. **Import the BaseProcessor class**:
+   ```python
+   from lead_recovery.processors.base import BaseProcessor
+   ```
+
+3. **Define your processor class** that inherits from BaseProcessor:
+   ```python
+   class MyCustomProcessor(BaseProcessor):
+       GENERATED_COLUMNS = [
+           "my_feature1", 
+           "my_feature2"
+       ]
+       
+       def _validate_params(self):
+           # Implement parameter validation
+           pass
+       
+       def process(self, lead_data, conversation_data, existing_results):
+           # Implement processing logic
+           return {"my_feature1": value1, "my_feature2": value2}
+   ```
+
+4. **Implement parameter validation** in `_validate_params()`. This should check that any parameters passed to the processor are valid and expected.
+
+5. **Implement the processing logic** in the `process()` method. This should:
+   - Handle the case where `conversation_data` is None or empty
+   - Use parameters from `self.params` with defaults
+   - Return a dictionary with keys exactly matching the `GENERATED_COLUMNS` list
+
+6. **Add appropriate documentation** including docstrings explaining:
+   - The purpose of the processor
+   - The meaning of each generated column
+   - The parameters the processor accepts
+
+## Built-in Processors
+
+The Lead Recovery system includes several built-in processors for common analysis tasks.
+
+### TemporalProcessor
+
+**Module Path**: `lead_recovery.processors.temporal.TemporalProcessor`
+
+**Description**: Calculates time-related features from conversation history, including timestamps and time intervals between messages.
+
+**Parameters**:
+- `timezone` (default: "America/Mexico_City"): Timezone for timestamp calculations
+- `skip_detailed_temporal` (default: false): Skip detailed calculations
+- `skip_hours_minutes` (default: false): Skip hours/minutes calculations
+- `skip_reactivation_flags` (default: false): Skip reactivation window flags
+- `skip_timestamps` (default: false): Skip timestamp formatting
+- `skip_user_message_flag` (default: false): Skip user message flag
+
+**Generated Columns**:
+- `HOURS_MINUTES_SINCE_LAST_USER_MESSAGE`: Time since last user message in "Xh Ym" format
+- `HOURS_MINUTES_SINCE_LAST_MESSAGE`: Time since last message in "Xh Ym" format
+- `IS_WITHIN_REACTIVATION_WINDOW`: Boolean flag for reactivation window
+- `IS_RECOVERY_PHASE_ELIGIBLE`: Boolean flag for recovery phase eligibility
+- `LAST_USER_MESSAGE_TIMESTAMP_TZ`: Timestamp of last user message
+- `LAST_MESSAGE_TIMESTAMP_TZ`: Timestamp of last message
+- `NO_USER_MESSAGES_EXIST`: Boolean flag indicating if user messages exist
+
+### MessageMetadataProcessor
+
+**Module Path**: `lead_recovery.processors.metadata.MessageMetadataProcessor`
+
+**Description**: Extracts metadata from conversation messages such as sender information and message content.
+
+**Parameters**:
+- `max_message_length` (default: 150): Maximum length for stored message text
+
+**Generated Columns**:
+- `last_message_sender`: Sender of the last message (user/kuna)
+- `last_user_message_text`: Text of the last user message
+- `last_kuna_message_text`: Text of the last kuna message
+- `last_message_ts`: Timestamp of the last message
+
+### HandoffProcessor
+
+**Module Path**: `lead_recovery.processors.handoff.HandoffProcessor`
+
+**Description**: Analyzes handoff processes in conversations, detecting invitations and responses.
+
+**Parameters**:
+- `skip_handoff_invitation` (default: false): Skip handoff invitation detection
+- `skip_handoff_started` (default: false): Skip handoff started detection
+- `skip_handoff_finalized` (default: false): Skip handoff finalized detection
+
+**Generated Columns**:
+- `handoff_invitation_detected`: Whether a handoff invitation was detected
+- `handoff_response`: Response type to handoff (NO_INVITATION, DECLINED_HANDOFF, STARTED_HANDOFF, etc.)
+- `handoff_finalized`: Whether the handoff was successfully completed
+
+### TemplateDetectionProcessor
+
+**Module Path**: `lead_recovery.processors.template.TemplateDetectionProcessor`
+
+**Description**: Identifies templated messages in conversations, including recovery templates and top-up offers.
+
+**Parameters**:
+- `template_type` (default: "all"): Type of templates to detect (all, recovery, topup)
+- `skip_recovery_template` (default: false): Skip recovery template detection
+- `skip_topup_template` (default: false): Skip top-up template detection
+- `skip_consecutive_count` (default: false): Skip counting consecutive templates
+
+**Generated Columns**:
+- `recovery_template_detected`: Whether a recovery template was detected
+- `topup_template_detected`: Whether a top-up template was detected
+- `consecutive_recovery_templates_count`: Count of consecutive recovery templates
+
+### ValidationProcessor
+
+**Module Path**: `lead_recovery.processors.validation.ValidationProcessor`
+
+**Description**: Detects pre-validation questions and messages in conversations.
+
+**Parameters**:
+- `skip_validacion_detection` (default: false): Skip validation detection
+
+**Generated Columns**:
+- `pre_validacion_detected`: Whether pre-validation messages were detected
+
+### ConversationStateProcessor
+
+**Module Path**: `lead_recovery.processors.conversation_state.ConversationStateProcessor`
+
+**Description**: Determines the overall state of a conversation based on validation and handoff status.
+
+**Parameters**:
+- `skip_state_determination` (default: false): Skip state determination
+
+**Generated Columns**:
+- `conversation_state`: The current state of the conversation (PRE_VALIDACION, POST_VALIDACION, HANDOFF)
+
+### HumanTransferProcessor
+
+**Module Path**: `lead_recovery.processors.human_transfer.HumanTransferProcessor`
+
+**Description**: Detects messages indicating a transfer to a human agent.
+
+**Parameters**:
+- `skip_human_transfer_detection` (default: false): Skip human transfer detection
+
+**Generated Columns**:
+- `human_transfer`: Whether a human transfer message was detected
+
+## Configuring Processors in meta.yml
+
+Processors are configured in the `meta.yml` file of a recipe under the `python_processors` section. Each processor entry includes:
+
+1. **module**: The full Python module path to the processor class
+2. **params**: Optional parameters specific to the processor
+
+### Example Configuration
+
+```yaml
+python_processors:
+  - module: "lead_recovery.processors.temporal.TemporalProcessor"
+    params:
+      timezone: "America/Mexico_City"
+  - module: "lead_recovery.processors.metadata.MessageMetadataProcessor"
+    params:
+      max_message_length: 150
+  - module: "lead_recovery.processors.handoff.HandoffProcessor"
+    params: {}
+  - module: "lead_recovery.processors.template.TemplateDetectionProcessor"
+    params:
+      template_type: "recovery"
+  - module: "lead_recovery.processors.validation.ValidationProcessor"
+    params: {}
+  - module: "lead_recovery.processors.conversation_state.ConversationStateProcessor"
+    params: {}
+  - module: "lead_recovery.processors.human_transfer.HumanTransferProcessor"
+    params: {}
+```
+
+### Processor Order
+
+The order of processors in the list matters. Processors are executed sequentially in the order specified, and later processors can access results from earlier processors.
+
+For example, if ConversationStateProcessor depends on results from ValidationProcessor, then ValidationProcessor should appear earlier in the list.
+
+## Troubleshooting Processors
+
+Common issues and their solutions:
+
+1. **Missing columns in output**: Ensure the processor correctly returns all columns listed in its GENERATED_COLUMNS attribute. Check if any conditional logic might prevent columns from being added to the result dictionary.
+
+2. **Parameter validation errors**: Verify that the parameters in meta.yml match those expected by the processor. Check the processor's _validate_params method for the list of accepted parameters.
+
+3. **Processor import errors**: Confirm the module path in meta.yml is correct and the processor class exists at that path.
+
+4. **Unexpected output values**: Enable DEBUG logging to see detailed processor execution and intermediate results.
+
+5. **Runtime errors**: Check that the processor properly handles edge cases like empty conversation data, missing columns, or unexpected data types. 

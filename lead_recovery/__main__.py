@@ -1,4 +1,4 @@
-from lead_recovery.cli import main
+from lead_recovery.cli.main import main
 
 if __name__ == "__main__":
     main() 

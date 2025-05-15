@@ -25,10 +25,6 @@ from .cache import SummaryCache, compute_conversation_digest # Import cache util
 
 logger = logging.getLogger(__name__)
 
-# Hardcoded enum values for 'simulation-to-handoff' specific validation (REMOVED - Now from meta.yml)
-# SIMULATION_STALL_REASONS = { ... }
-# SIMULATION_NEXT_ACTIONS = { ... }
-
 class ConversationSummarizer:
     """Generate text summary for a single conversation DataFrame."""
 
@@ -37,7 +33,6 @@ class ConversationSummarizer:
         model: str = "o4-mini",
         max_tokens: int = 4096,
         prompt_template_path: str | Path | None = None,
-        # expected_yaml_keys: List[str] | None = None, # Now part of meta_config
         use_cache: bool = True,
         cache_dir: Path | None = None,
         meta_config: Optional[Dict[str, Any]] = None # Add meta_config
@@ -50,7 +45,6 @@ class ConversationSummarizer:
             prompt_template_path: Optional path to a *recipe‑specific* prompt
                 template. If ``None`` (default), it falls back to the original
                 global prompt shipped under ``lead_recovery/prompts``.
-            # expected_yaml_keys: List of keys expected in the YAML output for validation (deprecated, use meta_config).
             use_cache: Whether to use the summary cache to avoid redundant API calls.
             cache_dir: Directory to store the cache database. If None, uses default.
             meta_config: Parsed content of the recipe's meta.yml file.
@@ -65,12 +59,9 @@ class ConversationSummarizer:
         self.model = meta_config.get("model_name", model) if meta_config else model
         logger.info(f"Using model: {self.model}")
         self.max_tokens = max_tokens
-        # self.expected_yaml_keys = set(expected_yaml_keys) if expected_yaml_keys else None # Now from meta_config
         self.meta_config = meta_config if meta_config else {}
-        self.expected_yaml_keys = set(self.meta_config.get('expected_yaml_keys', []))
-        self.validation_enums = self.meta_config.get('validation_enums', {})
         
-        # Store the last key for cleanup from meta_config or use default
+        # Store metadata needed for yaml parsing, but NOT for validation
         self.yaml_terminator_key = self.meta_config.get('yaml_terminator_key', 'suggested_message_es:')
         
         self._prompt_template_path = None # Store the path for potential later use
@@ -270,31 +261,8 @@ class ConversationSummarizer:
             # Re-wrap as our ApiError
             raise ApiError(f"Unexpected error in OpenAI call: {e}")
 
-    # ------------------------------------------------------------------ #
-    def _validate_yaml(self, parsed_data: Dict[str, Any]) -> List[str]:
-        """Validate parsed YAML data against expected keys and enums."""
-        validation_errors = []
-        actual_keys = set(parsed_data.keys())
-
-        if self.expected_yaml_keys:
-            missing_keys = self.expected_yaml_keys - actual_keys
-            if missing_keys:
-                validation_errors.append(f"Missing keys: {missing_keys}")
-            
-            extra_keys = actual_keys - self.expected_yaml_keys
-            if extra_keys:
-                logger.warning("Found extra keys in YAML output: %s", extra_keys)
-        else:
-            logger.warning("No expected_yaml_keys provided for validation. Skipping key check.")
-
-        # Enum Value Validation - This part is already in the summarize method's auto-fixing logic
-        # but can be duplicated here for a standalone validation check if needed, or kept centralized.
-        # For now, focusing on key validation as that was the direct cause of the error.
-        # Consider moving enum validation here if it makes the code cleaner.
-        return validation_errors
-
     async def summarize(self, conv_df: pd.DataFrame, temporal_flags: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Generates a summary and parses it into a structured dictionary.
+        """Generates a summary by calling the LLM and returning the basic parsed result.
         
         Args:
             conv_df: DataFrame containing conversation messages for a single lead.
@@ -303,33 +271,34 @@ class ConversationSummarizer:
                             (including temporal, metadata, state, and other specific flags).
 
         Returns:
-            A dictionary containing parsed fields based on the prompt/recipe.
-            Returns a dictionary with an 'error' key if parsing/validation fails.
+            A dictionary containing the parsed YAML from the LLM response.
+            Does not perform validation against expected keys or enums - that's the caller's responsibility.
         """
-        # Define a standard way to return errors
-        # Removed _create_error_result - will raise exceptions instead.
-
         try:
-            # --- Prompt Formatting (Now done *before* calling summarize) ---
-            # This section assumes the prompt template has already been loaded in __init__
-            # and expects cli.py (or the caller) to format it using runtime args.
+            # Format conversation text 
+            conversation_text = "\\n".join(
+                f"[{str(getattr(row, 'creation_time', 'Unknown Time'))[:19]}] {getattr(row, 'msg_from', 'Unknown Sender')}: {getattr(row, 'message', 'No Message')}"
+                for row in conv_df.itertuples(index=False)
+            )
+
+            # Compute digest for caching
+            conversation_digest = compute_conversation_digest(conversation_text)
             
-            # Calculate formatting args from conv_df if they weren't passed (fallback/direct use case)
-            # This might need refinement depending on how cli.py passes info
+            # Basic timestamp calculations for prompt formatting if needed
             now_cdmx = datetime.now(pytz.timezone('America/Mexico_City'))
             hoy_es_cdmx = now_cdmx.isoformat()
             last_ts = None
-            delta_min = float('inf') # Default to infinity if no last timestamp
-            delta_real_time_hrs = float('inf') # Initialize hours delta
-            delta_real_time_formateado = "N/A" # Initialize formatted string
+            delta_min = float('inf')
+            delta_real_time_hrs = float('inf')
+            delta_real_time_formateado = "N/A"
+            last_query_timestamp = 'N/A'
             
-            # --- Explicitly convert creation_time to datetime before finding max ---
+            # Get basic timestamp info from conversation data if available
             if not conv_df.empty and 'creation_time' in conv_df.columns:
                 try:
                     creation_times = pd.to_datetime(conv_df['creation_time'], errors='coerce')
                     max_time = creation_times.max()
                     if pd.notna(max_time):
-                        # Ensure max_time is timezone-aware (assume UTC if naive, adjust as needed)
                         if max_time.tzinfo is None:
                              max_time = max_time.tz_localize('UTC') 
                         last_ts = max_time
@@ -346,26 +315,10 @@ class ConversationSummarizer:
                             delta_real_time_formateado = f"{delta_real_time_hrs:.1f} h"
                         else:
                             delta_real_time_formateado = f"{delta_real_time_hrs / 24:.1f} días"
-                    else:
-                        last_query_timestamp = 'N/A'
                 except Exception as e_time:
                      logger.warning(f"Error processing creation_time in conv_df: {e_time}")
-                     last_query_timestamp = 'N/A'
-            else:
-                 last_query_timestamp = 'N/A'
-            # --- End conversion and delta calculation ---
-
-            # Format conversation text
-            conversation_text = "\\n".join(
-                f"[{str(getattr(row, 'creation_time', 'Unknown Time'))[:19]}] {getattr(row, 'msg_from', 'Unknown Sender')}: {getattr(row, 'message', 'No Message')}"
-                for row in conv_df.itertuples(index=False)
-            )
-
-            # Compute digest early for caching - use conversation text for stable hashing
-            conversation_digest = compute_conversation_digest(conversation_text)
             
             # Check cache first if enabled
-            logger.debug(f"ConversationSummarizer.summarize: Checking cache for digest {conversation_digest[:8]}... with self.use_cache={self.use_cache} (type: {type(self.use_cache)})")
             if self.use_cache and self._cache:
                 cached_summary = self._cache.get(conversation_digest, self.model)
                 if cached_summary is not None:
@@ -377,46 +330,37 @@ class ConversationSummarizer:
                         cached_summary["last_message_ts"] = last_query_timestamp
                     return cached_summary
 
-            # Format the prompt using the template loaded in __init__
+            # Format the prompt
             try:
-                 # Create format args dictionary. Start with locally calculated/static values.
-                 format_args = {
-                     "conversation_text": conversation_text,
-                     "HOY_ES": hoy_es_cdmx,
-                     "LAST_QUERY_TIMESTAMP": last_query_timestamp,
-                     "delta_min": delta_min, 
-                     "delta_real_time_formateado": delta_real_time_formateado
-                     # Python-calculated flags will be added next from temporal_flags
-                 }
-                 
-                 # Add all Python-calculated flags (passed via temporal_flags) to format_args
-                 if temporal_flags:
-                     # Log the flags being added to help with debugging
-                     logger.debug(f"Adding all flags from temporal_flags to format_args. Keys: {sorted(list(temporal_flags.keys()))}")
-                     format_args.update(temporal_flags)
-                 else:
-                     logger.warning("temporal_flags dictionary is None or empty. Prompt might be missing expected keys for formatting.")
-                 
-                 # Format the prompt with all arguments
-                 prompt = self.prompt_template.format(**format_args)
-                 
-                 # Log a success message with the keys used in formatting
-                 logger.debug(f"Successfully formatted prompt with keys: {sorted(format_args.keys())}")
+                # Create format args dictionary
+                format_args = {
+                    "conversation_text": conversation_text,
+                    "HOY_ES": hoy_es_cdmx,
+                    "LAST_QUERY_TIMESTAMP": last_query_timestamp,
+                    "delta_min": delta_min, 
+                    "delta_real_time_formateado": delta_real_time_formateado
+                }
+                
+                # Add all Python-calculated flags to format_args
+                if temporal_flags:
+                    logger.debug(f"Adding all flags from temporal_flags to format_args. Keys: {sorted(list(temporal_flags.keys()))}")
+                    format_args.update(temporal_flags)
+                else:
+                    logger.warning("temporal_flags dictionary is None or empty. Prompt might be missing expected keys for formatting.")
+                
+                # Format the prompt with all arguments
+                prompt = self.prompt_template.format(**format_args)
+                
             except KeyError as e:
-                 # Handle cases where the prompt template might be missing expected placeholders
-                 error_msg = f"Prompt template {self._prompt_template_path} missing expected format key: {e}"
-                 logger.error(error_msg)
-                 # Return error including the missing key information
-                 # Raise ValidationError instead of returning error dict
-                 raise ValidationError(error_msg) from e
+                error_msg = f"Prompt template {self._prompt_template_path} missing expected format key: {e}"
+                logger.error(error_msg)
+                raise ValidationError(error_msg) from e
             except Exception as format_e:
-                 # Catch other formatting errors
-                 error_msg = f"Error formatting prompt template {self._prompt_template_path}: {format_e}"
-                 logger.error(error_msg, exc_info=True)
-                 # Raise ValidationError instead of returning error dict
-                 raise ValidationError(error_msg) from format_e
+                error_msg = f"Error formatting prompt template {self._prompt_template_path}: {format_e}"
+                logger.error(error_msg, exc_info=True)
+                raise ValidationError(error_msg) from format_e
 
-            # --- Call OpenAI API ---
+            # Call OpenAI API
             messages = [
                 {
                     "role": "system",
@@ -454,141 +398,14 @@ class ConversationSummarizer:
                     cleaned_text = clean_response_text(raw_summary_text, yaml_terminator_key=self.yaml_terminator_key)
                     parsed_data = parse_yaml_dict(cleaned_text)
                 except ValueError as second_e:
-                    # Both attempts failed, log the details and raise the exception
                     logger.error(f"Both YAML parsing attempts failed. First error: {e}, Second error: {second_e}")
                     logger.error(f"Raw response from second attempt:\n{raw_summary_text[:500]}...")
                     raise ValidationError(f"Failed to parse YAML response after multiple attempts: {second_e}", 
                                          raw_response=raw_summary_text) from second_e
-
-            # --- Validation ---
-            validation_errors = []
-
-            # 1. Key Validation
-            actual_keys = set(parsed_data.keys())
-            if self.expected_yaml_keys:
-                # Check for missing keys
-                missing_keys = self.expected_yaml_keys - actual_keys
-                extra_keys = actual_keys - self.expected_yaml_keys
-                if missing_keys:
-                    validation_errors.append(f"Missing keys: {missing_keys}")
-                if extra_keys:
-                     logger.warning("Found extra keys in YAML output: %s", extra_keys)
-            else:
-                logger.warning("No expected_yaml_keys provided for validation. Skipping key check.")
-
-            # 3. Enum Value Validation (Conditional based on keys present in validation_enums and parsed_data)
-            for enum_key, allowed_values_list in self.validation_enums.items():
-                if enum_key in parsed_data:
-                    value_to_check = parsed_data.get(enum_key)
-                    allowed_values_set = set(allowed_values_list) # Convert list to set for efficient lookup
-                    if value_to_check not in allowed_values_set:
-                        validation_errors.append(f"Invalid value for '{enum_key}': '{value_to_check}'. Allowed: {allowed_values_set}")
             
-            # --- Handle Validation Results ---
-            if validation_errors:
-                # Auto-fix invalid values
-                warnings.warn(f"YAML Validation issues detected: {validation_errors}. Attempting to fix automatically.")
-                
-                # Special handling for cases where no user messages exist
-                logger.info(f"CHECKING TEMPORAL_FLAGS: {temporal_flags}")
-                if temporal_flags and temporal_flags.get('NO_USER_MESSAGES_EXIST', False):
-                    logger.info(f"FOUND NO_USER_MESSAGES_EXIST=True in temporal_flags")
-                    # If no user messages exist, always set these values regardless of LLM output
-                    if 'primary_stall_reason_code' in parsed_data:
-                        logger.warning(f"Auto-fixing primary_stall_reason_code to 'NUNCA_RESPONDIO' for conversation with NO_USER_MESSAGES_EXIST=True")
-                        parsed_data['primary_stall_reason_code'] = 'NUNCA_RESPONDIO'
-                    
-                    if 'next_action_code' in parsed_data:
-                        # Check how long since last message
-                        hours_mins = temporal_flags.get('HOURS_MINUTES_SINCE_LAST_MESSAGE', '')
-                        logger.info(f"HOURS_MINUTES_SINCE_LAST_MESSAGE = {hours_mins}")
-                        if hours_mins and hours_mins.startswith(('0h', '1h')):
-                            # If less than 2 hours, set to ESPERAR
-                            logger.warning(f"Auto-fixing next_action_code to 'ESPERAR' for conversation with NO_USER_MESSAGES_EXIST=True and recent message")
-                            parsed_data['next_action_code'] = 'ESPERAR'
-                        else:
-                            # Otherwise, call the lead
-                            logger.warning(f"Auto-fixing next_action_code to 'LLAMAR_LEAD_NUNCA_RESPONDIO' for conversation with NO_USER_MESSAGES_EXIST=True")
-                            parsed_data['next_action_code'] = 'LLAMAR_LEAD_NUNCA_RESPONDIO'
-                else:
-                    logger.info(f"NO_USER_MESSAGES_EXIST condition not met. temporal_flags: {temporal_flags}")
-                    # Auto-fix missing keys by adding defaults
-                    if self.expected_yaml_keys:
-                        for key in self.expected_yaml_keys:
-                            if key not in parsed_data:
-                                parsed_data[key] = "N/A"  # Default placeholder for missing keys
-                                logger.warning(f"Auto-fixing missing key \'{key}\' by setting to N/A")
-                    
-                    # Auto-fix invalid enum values
-                    for enum_key, allowed_values_list in self.validation_enums.items():
-                        if enum_key in parsed_data:
-                            value = parsed_data.get(enum_key)
-                            original_value_for_logging = str(value) # Keep original for logging/comparison
-
-                            # 1. Attempt to strip common quotes and whitespace if value is a string
-                            if isinstance(value, str):
-                                stripped_value = value.strip() # Remove leading/trailing whitespace first
-                                if stripped_value: # Ensure not an empty string after stripping whitespace
-                                    if (stripped_value.startswith("'") and stripped_value.endswith("'")) or \
-                                       (stripped_value.startswith('"') and stripped_value.endswith('"')):
-                                        # Remove one layer of quotes
-                                        stripped_value = stripped_value[1:-1]
-                                
-                                if value != stripped_value: # If stripping changed the value
-                                     logger.info(f"Stripped quotes/whitespace from '{original_value_for_logging}' to '{stripped_value}' for key '{enum_key}'")
-                                value = stripped_value # Use the potentially stripped value for further checks
-                            
-                            # 2. Check if (potentially stripped) value is valid
-                            if value in allowed_values_list:
-                                if parsed_data.get(enum_key) != value: # Update only if different from original in parsed_data
-                                    logger.info(f"Corrected value for '{enum_key}' to (stripped and valid) '{value}' from '{original_value_for_logging}'")
-                                    parsed_data[enum_key] = value
-                                continue # Value is now valid and stored, move to next enum_key
-
-                            # 3. If still not valid after stripping, apply defaulting logic:
-                            default_value_to_set: Optional[str] = None
-
-                            if enum_key in ["primary_stall_reason_code", "next_action_code"]:
-                                default_value_to_set = "N/A"
-                            elif allowed_values_list: # For non-critical fields, use the first allowed value
-                                default_value_to_set = allowed_values_list[0]
-                            else: # Fallback if no allowed values (should not happen with good config)
-                                logger.error(f"No allowed values defined for enum_key '{enum_key}' in meta.yml. Cannot set a default for original value '{original_value_for_logging}'. Using 'ERROR_NO_DEFAULTS'.")
-                                default_value_to_set = "ERROR_NO_DEFAULTS"
-                            
-                            if parsed_data.get(enum_key) != default_value_to_set : # Log and set only if different
-                                logger.warning(f"Auto-fixing invalid value '{original_value_for_logging}' (after stripping attempts yielded '{value}') for field '{enum_key}' to default '{default_value_to_set}'.")
-                                parsed_data[enum_key] = default_value_to_set
-                            elif value == default_value_to_set and parsed_data.get(enum_key) != default_value_to_set:
-                                # This case might occur if original value was, say, "N/A" (string) but was not in allowed_values_list
-                                # and the default is also "N/A". We still want to ensure the correct type/value is set.
-                                logger.info(f"Ensuring default value '{default_value_to_set}' is set for '{enum_key}' from original invalid '{original_value_for_logging}'.")
-                                parsed_data[enum_key] = default_value_to_set
-
-            # One more validation pass to ensure everything is fixed
-            final_validation_errors = self._validate_yaml(parsed_data)
-            if final_validation_errors:
-                logger.warning(f"FINAL VALIDATION ISSUES DETECTED: {final_validation_errors}. Fixing critical fields.")
-                # Special handling for critical fields that must be fixed
-                for enum_key in ["primary_stall_reason_code", "next_action_code"]:
-                    if enum_key in parsed_data:
-                        value = parsed_data.get(enum_key)
-                        if any([error.startswith(f"Invalid value for '{enum_key}'") for error in final_validation_errors]):
-                            parsed_data[enum_key] = "N/A"
-                            logger.warning(f"Critical field forced to N/A: {enum_key}")
-                            
-            # Process any NUNCA_RESPONDIO special case
-            if temporal_flags and temporal_flags.get('NO_USER_MESSAGES_EXIST') == True:
-                logger.info(f"NO_USER_MESSAGES_EXIST condition met. Setting special values for nunca respondio case.")
-                parsed_data['inferred_stall_stage'] = "PRE_VALIDACION"
-                parsed_data['primary_stall_reason_code'] = "NUNCA_RESPONDIO"
-                
-            # Successfully parsed and validated (or auto-fixed)
-            # ------------------------------------------------------------
-            # Attach cache helper fields
+            # Successfully parsed - attach cache helper fields
             parsed_data["conversation_digest"] = conversation_digest
             parsed_data["last_message_ts"] = last_query_timestamp
-            # ------------------------------------------------------------
             
             # Save to cache if enabled
             if self.use_cache and self._cache:
@@ -597,7 +414,6 @@ class ConversationSummarizer:
                     logger.debug(f"Saved summary to cache with digest: {conversation_digest[:8]}...")
                 except Exception as e:
                     logger.warning(f"Failed to save summary to cache: {e}", exc_info=True)
-                    # Don't fail the operation if caching fails
             
             return parsed_data
 

@@ -3,16 +3,15 @@
 # Script to run a recipe with limit option for faster testing
 # Usage: ./run_recipe.sh [recipe_name] [limit_number]
 
-RECIPE=${1:-fede_abril_preperfilamiento}
+RECIPE=${1:-simulation_to_handoff}
 LIMIT=${2:-10}  # Default to 10 conversations for quick testing
 
-echo "Running recipe: $RECIPE with temporal flags disabled, OpenAI summarization skipped, and $LIMIT conversation limit"
+echo "Running recipe: $RECIPE with processor execution enabled but data fetching and LLM summarization skipped, limited to $LIMIT conversations"
 
-# Run with ALL temporal flags explicitly disabled and skip OpenAI summarization
+# Run with data fetching and LLM summarization skipped, but processors enabled
 python -m lead_recovery.cli.main run --recipe $RECIPE \
   --skip-redshift \
   --skip-bigquery \
-  --skip-temporal-flags \
   --skip-summarize \
   --limit $LIMIT
 

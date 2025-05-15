@@ -60,8 +60,14 @@ def setup_environment():
     
     return True
 
-def run_pipeline(recipe: str):
-    """Run the lead recovery pipeline with the current settings."""
+def run_pipeline(recipe: str, additional_args=None):
+    """
+    Run the lead recovery pipeline for the specified recipe using the standardized CLI.
+    
+    Args:
+        recipe: Name of the recipe to run
+        additional_args: List of additional CLI arguments to pass to the main CLI
+    """
     start_time = datetime.now()
     logger.info(f"*** STARTING AUTOMATED PIPELINE RUN AT {start_time} FOR RECIPE: {recipe} ***")
     
@@ -83,46 +89,38 @@ def run_pipeline(recipe: str):
         logger.error("Ensure the virtual environment 'fresh_env' exists and is correctly structured.")
         return
 
-    # Check if we should use cached Redshift data
-    today = datetime.now().strftime('%Y%m%d')
-    cache_marker_path = Path(f"redshift_queried_{recipe}_{today}.marker")
-    use_cached_option = ""
-    ran_with_no_cache = False
-    
-    if cache_marker_path.exists():
-        # We already queried Redshift today for this recipe, use cached data
-        use_cached_option = "--use-cached-redshift"
-        logger.info(f"Using cached Redshift data for recipe {recipe} (marker found: {cache_marker_path})")
-    else:
-        # First run of the day for this recipe, query Redshift
-        use_cached_option = "--no-use-cached-redshift"
-        ran_with_no_cache = True
-        logger.info(f"Will attempt to query fresh Redshift data for recipe {recipe} (marker not found: {cache_marker_path})")
-            
-    # Build the command
-    command_parts = [
+    # Build the base command
+    cli_command = [
         str(python_executable),
         "-m", module_to_run,
         "run",
         "--recipe", recipe
     ]
-    if use_cached_option:
-        # --use-cached-redshift or --no-use-cached-redshift
-        command_parts.append(use_cached_option)
     
-    # Add --no-cache if you want to disable summary cache by default in cron, 
-    # or make it configurable if needed.
-    # For now, let's assume we want to use the cache by default in cron like interactive runs.
-    # command_parts.append("--no-cache") 
-
-    command = " ".join(command_parts)
-    logger.info(f"Executing command: {command}")
+    # Check if we should use cached Redshift data
+    today = datetime.now().strftime('%Y%m%d')
+    cache_marker_path = Path(f"redshift_queried_{recipe}_{today}.marker")
+    if cache_marker_path.exists():
+        # We already queried Redshift today for this recipe, use cached data
+        cli_command.append("--use-cached-redshift")
+        logger.info(f"Using cached Redshift data for recipe {recipe} (marker found: {cache_marker_path})")
+    else:
+        # First run of the day for this recipe, query Redshift
+        cli_command.append("--no-use-cached-redshift")
+        logger.info(f"Will attempt to query fresh Redshift data for recipe {recipe} (marker not found: {cache_marker_path})")
+    
+    # Add any additional CLI arguments
+    if additional_args:
+        cli_command.extend(additional_args)
+    
+    # Print the full command for debugging
+    command_str = " ".join(cli_command)
+    logger.info(f"Executing command: {command_str}")
     
     try:
         # Run the command and capture output
         result = subprocess.run(
-            command, 
-            shell=True, 
+            cli_command, 
             stdout=subprocess.PIPE, 
             stderr=subprocess.STDOUT,
             text=True
@@ -134,14 +132,9 @@ def run_pipeline(recipe: str):
             
         if result.returncode != 0:
             logger.error(f"Command for recipe {recipe} failed with return code {result.returncode}")
+            logger.error(f"Command output: {result.stdout}")
         else:
             logger.info(f"Pipeline for recipe {recipe} executed successfully")
-            if ran_with_no_cache:
-                try:
-                    cache_marker_path.touch()
-                    logger.info(f"Created Redshift marker file for recipe {recipe}: {cache_marker_path}")
-                except Exception as e:
-                    logger.error(f"Failed to create Redshift marker file for recipe {recipe} post-run: {e}")
             
         end_time = datetime.now()
         duration = end_time - start_time
@@ -172,11 +165,15 @@ if __name__ == "__main__":
         sys.exit(0)
     """
     
-    # Modified: Get recipe from command-line arguments
+    # Get recipe from command-line arguments
     if len(sys.argv) > 1:
         recipe_to_run = sys.argv[1]
-        print(f"*** DEBUG: Command-line argument received: {recipe_to_run} ***")
-        run_pipeline(recipe_to_run)
+        
+        # Collect any additional arguments (after the recipe name)
+        additional_args = sys.argv[2:] if len(sys.argv) > 2 else None
+        
+        logger.info(f"Running recipe: {recipe_to_run} with additional args: {additional_args}")
+        run_pipeline(recipe_to_run, additional_args)
     else:
-        logger.error("No recipe specified on the command line. Usage: python -m lead_recovery.scripts.automate_pipeline <recipe_name>")
+        logger.error("No recipe specified on the command line. Usage: python -m lead_recovery.scripts.automate_pipeline <recipe_name> [additional CLI arguments]")
         sys.exit(1) # Exit with an error code 

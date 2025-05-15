@@ -1,35 +1,52 @@
-# Basic metadata for the top_up_may recipe
-name: "top_up_may"
+recipe_name: "top_up_may"
+version: "1.0"
 description: "Recipe for analyzing lead engagement in the active Top Up May campaign, using leads.csv as input."
-dashboard_title: "Top Up May Campaign Analysis (CSV Input)"
-summary_format: yaml
 
-# Define input CSV file relative to the recipe directory
-input_csv_file: output_run/leads.csv
+data_input:
+  lead_source_type: csv
+  csv_config:
+    csv_file: "output_run/leads.csv"
+  conversation_sql_file_bigquery: "bigquery.sql"
 
-# Explicitly define SQL filenames (even if default)
-redshift_sql: redshift.sql # Required, but skipped via CLI flag
-bigquery_sql: bigquery.sql
-prompt_file: prompt.txt
+llm_config:
+  prompt_file: "prompt.txt"
+  expected_llm_keys:
+    lead_name:
+      description: "Name of the lead extracted from conversation."
+      type: str
+    summary:
+      description: "Estado + acción summary."
+      type: str
+    current_engagement_status:
+      description: "Current engagement status of the lead."
+      type: str
+    follow_up_attempts:
+      description: "Number of follow-up attempts."
+      type: int
+    next_action_code:
+      description: "Code indicating next action to take."
+      type: str
+    next_action_context:
+      description: "Context for next action."
+      type: str
+    suggested_message_es:
+      description: "Suggested message in Spanish."
+      type: str
+    transfer_context_analysis:
+      description: "Analysis of transfer context."
+      type: str
+  context_keys_from_python: []
 
-# Define the keys expected from the OpenAI prompt's YAML output
-# Derived from the updated prompt.txt for engagement analysis.
-expected_yaml_keys:
-  - lead_name
-  - summary                 # Estado + acción
-  - current_engagement_status
-  - follow_up_attempts
-  # Following fields are now provided by Python, not from LLM output
-  # - last_message_sender
-  # - last_user_message_text
-  # - last_kuna_message_text
-  - next_action_code
-  - next_action_context
-  - suggested_message_es
-  - transfer_context_analysis
+python_processors:
+  - module: "lead_recovery.processors.metadata.MessageMetadataProcessor"
+    params:
+      max_message_length: 150
+  - module: "lead_recovery.processors.template.TemplateDetectionProcessor"
+    params:
+      template_type: "topup"
+      skip_recovery_template: true
+      skip_consecutive_count: true
 
-# Define the columns to include in the final output report
-# Assumes 'cleaned_phone' is a column in leads.csv
 output_columns:
   - cleaned_phone
   - lead_name
@@ -43,4 +60,5 @@ output_columns:
   - next_action_code
   - next_action_context
   - suggested_message_es
-  - transfer_context_analysis 
+  - transfer_context_analysis
+  - topup_template_detected 

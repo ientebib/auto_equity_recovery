@@ -1,6 +1,6 @@
 """CLI command for generating reports from analysis results."""
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Union
 from datetime import datetime
 import logging
 import yaml
@@ -8,7 +8,7 @@ import yaml
 import typer
 import pandas as pd
 
-from ..reporting import to_html, to_csv
+from ..reporting import export_data
 from ..config import settings
 
 logger = logging.getLogger(__name__)
@@ -20,9 +20,9 @@ def report(
     output_dir: Path = typer.Option(settings.OUTPUT_DIR, "--output-dir"),
     # Added: Recipe name for output filename
     recipe_name: Optional[str] = typer.Option(None, help="Recipe name for output filename."),
-    format: str = typer.Option("html", "--format", "-f", help="Output format: html, csv, or both"),
+    format: str = typer.Option("csv", "--format", "-f", help="Output format: csv, json, or all"),
 ):
-    """Generate HTML/CSV reports from merged analysis results."""
+    """Generate reports from merged analysis results."""
     # Default recipe name if not provided (e.g., when called directly, not via 'run')
     _recipe_name = recipe_name or output_dir.name
     today_str = datetime.now().strftime('%Y%m%d')
@@ -41,8 +41,12 @@ def report(
             raise typer.Exit(1)
 
     # Load the CSV data
-    df = pd.read_csv(csv_input_path)
-    logger.info(f"Loaded {len(df)} rows from {csv_input_path}")
+    try:
+        df = pd.read_csv(csv_input_path)
+        logger.info(f"Loaded {len(df)} rows from {csv_input_path}")
+    except Exception as e:
+        typer.echo(f"Error loading CSV file {csv_input_path}: {e}")
+        raise typer.Exit(1)
     
     # Try to load output_columns from meta.yml if recipe_name is provided
     output_columns = None
@@ -58,17 +62,41 @@ def report(
             except Exception as e:
                 logger.warning(f"Error loading meta.yml for recipe {recipe_name}: {e}")
     
-    # Generate outputs based on requested format
-    if format.lower() in ["html", "both"]:
-        html_output_path = output_dir / f"{base_filename}.html"
-        to_html(df, html_output_path, columns=output_columns)
-        typer.echo(f"HTML report generated at {html_output_path}")
+    # Determine which formats to export based on the format parameter
+    export_formats = []
+    format_value = str(format).lower()
+    if hasattr(format, 'name') and hasattr(format, 'default'):
+        # This is likely a typer.Option object, use its default value
+        format_value = format.default or "csv"
+        format_value = format_value.lower()
     
-    if format.lower() in ["csv", "both"]:
-        # Only regenerate CSV if not the same as input
-        new_csv_path = output_dir / f"{base_filename}_report.csv"
-        if new_csv_path != csv_input_path:
-            to_csv(df, new_csv_path, columns=output_columns)
-            typer.echo(f"CSV report generated at {new_csv_path}")
-            
-    return df  # Return the DataFrame for programmatic access 
+    if format_value == "all":
+        export_formats = ["csv", "json"]
+    elif format_value in ["csv", "json"]:
+        export_formats = [format_value]
+    else:
+        logger.warning(f"Unsupported format: {format_value}. Using csv as default.")
+        export_formats = ["csv"]
+    
+    # Use the unified export function
+    try:
+        # Ensure we don't overwrite the input file if it's part of the export formats
+        output_base_name = f"{base_filename}_report" if "csv" in export_formats else base_filename
+        
+        result_paths = export_data(
+            df=df,
+            output_dir=output_dir,
+            base_name=output_base_name,
+            formats=export_formats,
+            columns=output_columns
+        )
+        
+        # Report to user
+        for fmt, path in result_paths.items():
+            typer.echo(f"{fmt.upper()} report generated at {path}")
+        
+        return df  # Return the DataFrame for programmatic access
+    except Exception as e:
+        logger.error(f"Error generating reports: {e}")
+        typer.echo(f"Error generating reports: {e}")
+        raise typer.Exit(1) 

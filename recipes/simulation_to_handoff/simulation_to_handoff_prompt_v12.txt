@@ -23,7 +23,7 @@ HOURS_MINUTES_SINCE_LAST_MESSAGE: {HOURS_MINUTES_SINCE_LAST_MESSAGE}         # F
 
 # General State Flags (Calculados por Python)
 NO_USER_MESSAGES_EXIST: {NO_USER_MESSAGES_EXIST}               # True si el usuario NUNCA ha enviado un mensaje.
-HUMAN_TRANSFER: {human_transfer_detected_by_python} # True if Python detect_human_transfer function returned True.
+HUMAN_TRANSFER: {human_transfer} # True if Python detect_human_transfer function returned True.
 
 # --- Message Metadata ---
 LAST_MESSAGE_SENDER: {last_message_sender} # 'user' or 'kuna'
@@ -101,8 +101,8 @@ Analiza la conversación para determinar con precisión para el equipo de recupe
 
 ## ANÁLISIS DE TRANSFERENCIA A HUMANO
 *   `transfer_context_analysis`:
-    *   **Si `{human_transfer_detected_by_python}` es `True`:** Analiza `last_user_message_text` (el mensaje JUSTO ANTES de la transferencia). Explica concisamente (máx 20 palabras) por qué la IA inicial probablemente falló.
-    *   **Si `{human_transfer_detected_by_python}` es `False`:** Pon "N/A".
+    *   **Si `{human_transfer}` es `True`:** Analiza `last_user_message_text` (el mensaje JUSTO ANTES de la transferencia). Explica concisamente (máx 20 palabras) por qué la IA inicial probablemente falló.
+    *   **Si `{human_transfer}` es `False`:** Pon "N/A".
 
 ## DIMENSIONES DE ANÁLISIS PARA CAMPOS YAML
 
