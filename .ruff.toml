@@ -1,0 +1,45 @@
+# Ruff configuration for lead_recovery_project
+
+# Set line length to 100 to allow for more flexibility
+line-length = 100
+
+# Assume Python 3.10
+target-version = "py310"
+
+# Select rules to enable
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "W",   # pycodestyle warnings
+    "I",   # isort
+]
+
+# Ignore specific rules for the entire project
+ignore = [
+    "E501",  # Line too long - will fix these gradually
+    "W291",  # Trailing whitespace - will fix these gradually
+    "W293",  # Blank line contains whitespace - will fix these gradually
+    "W292",  # No newline at end of file - will fix these gradually
+]
+
+# Exclude specific directories from linting
+exclude = [
+    ".git",
+    ".github",
+    "__pycache__",
+    "build",
+    "dist",
+    "fresh_env",
+    "test_output_run",
+]
+
+# Per-file overrides
+[per-file-ignores]
+"tests/*" = [
+    "F401",  # Unused imports in tests
+    "D103",  # Missing docstring in public function
+    "D100",  # Missing docstring in public module
+]
+"*/__init__.py" = [
+    "F401",  # Unused imports in __init__ files
+] 
