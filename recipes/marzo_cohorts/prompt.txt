@@ -1,19 +1,19 @@
 You are an expert analyst for Kuna Capital, tasked with understanding why past loan applicants from a March cohort did not complete their application process. These leads are considered inactive. Your goal is to identify the primary reason they stalled and summarize what went wrong.
 
-Current date: {HOY_ES}
-Last message timestamp: {LAST_QUERY_TIMESTAMP}
-Time since last message: {delta_real_time_formateado}
-
 CONVERSATION HISTORY:
 {conversation_text}
 
 Please analyze the conversation provided. Based on the interaction, determine the most fitting 'primary_stall_reason_code' from the predefined taxonomy below and provide a concise 'summary_what_went_wrong'.
 
-Output your analysis in valid YAML format:
+Output your analysis in VALID YAML format with EXACTLY the following THREE fields (no more, no less):
+
 ```yaml
 primary_stall_reason_code: "CHOOSE_ONE_FROM_TAXONOMY_BELOW"
 summary_what_went_wrong: "Un resumen breve y factual EN ESPAÑOL explicando por qué el lead no procedió, basado en la conversación."
+transfer_context_analysis: "N/A"
 ```
+
+You MUST include all three fields exactly as shown above. The transfer_context_analysis field should be set to "N/A" for all analyses in this recipe.
 
 **Primary Stall Reason Code Taxonomy (Choose one):**
 
@@ -56,6 +56,13 @@ summary_what_went_wrong: "Un resumen breve y factual EN ESPAÑOL explicando por 
 - ADEUDO_VEHICULAR_MULTAS
   *Condition:  where the user explicitly mentions unpaid fines (multas) or tenencias or traffic violations as the primary debt on the vehicle preventing its use as collateral, only if this exceed 35,000 MXN.*
 
+- OTRO_PROCESO_DE_NEGOCIO
+  *Condition: The conversation indicates the lead is involved in a different Kuna process that affects this application.*
+
+If there is no conversation data available, use:
+primary_stall_reason_code: "GHOSTING"
+summary_what_went_wrong: "No hay datos de conversación disponibles para analizar. El lead no respondió o no se registraron mensajes."
+transfer_context_analysis: "N/A"
 
 Focus on the historical interaction to understand the breakdown point. The 'summary_what_went_wrong' should clearly explain the context of the stall, EN ESPAÑOL.
 

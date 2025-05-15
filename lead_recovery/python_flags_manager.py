@@ -113,14 +113,14 @@ def get_python_flag_columns(
     if not skip_consecutive_templates_count:
         included_columns.update(FUNCTION_COLUMNS["count_consecutive_recovery_templates"])
     
-    # Handoff detection (combined logic from multiple functions)
+    # Handoff detection (updated to use HandoffProcessor columns directly)
     if not skip_handoff_detection:
         if not skip_handoff_finalized:
             included_columns.update(FUNCTION_COLUMNS["handoff_finalized"])
         
         if not (skip_handoff_invitation and skip_handoff_started and skip_handoff_finalized):
-            # Only include handoff process columns if at least one handoff detection step is enabled
-            handoff_process_columns = set(FUNCTION_COLUMNS["analyze_handoff_process"])
+            # Define handoff columns directly from HandoffProcessor
+            handoff_process_columns = set(["handoff_invitation_detected", "handoff_response", "handoff_finalized"])
             
             # Adjust based on specific skips
             if skip_handoff_invitation:
@@ -130,7 +130,7 @@ def get_python_flag_columns(
                 handoff_process_columns.discard("handoff_response")
             
             if skip_handoff_finalized and "handoff_finalized" in handoff_process_columns:
-                # Don't add duplicate handoff_finalized from analyze_handoff_process if we already have it
+                # Don't add duplicate handoff_finalized if we already have it
                 handoff_process_columns.discard("handoff_finalized")
                 
             included_columns.update(handoff_process_columns)

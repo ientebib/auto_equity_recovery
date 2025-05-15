@@ -276,132 +276,115 @@ async def run_summarization_step(
         semaphore = asyncio.Semaphore(max_workers)
         
         async def process_conversation(phone: str, conv_df: pd.DataFrame) -> None:
-            """Process a single conversation.
-            
-            This function orchestrates the per-lead processing flow:
-            1. Run all processors on the conversation data
-            2. Call the LLM with processor results as context
-            3. Validate and fix the LLM output
-            4. Store the results
-            
-            Args:
-                phone: The phone number (lead identifier)
-                conv_df: DataFrame containing conversation messages
-            """
+            """Process a single conversation with retry logic for semaphore timeouts."""
             nonlocal completed
-            
-            try:
-                # Try to acquire semaphore with timeout to prevent deadlocks
+            max_retries = 3
+            retry_delay = 5  # seconds
+            attempt = 0
+            while attempt < max_retries:
+                attempt += 1
                 try:
-                    await asyncio.wait_for(semaphore.acquire(), timeout=60)
-                    logger.debug(f"Acquired semaphore for phone {phone}")
-                except asyncio.TimeoutError:
-                    logger.error(f"Timed out waiting for semaphore for phone {phone}")
-                    completed += 1
-                    summaries[phone] = {
-                        "summary": "ERROR: Timed out waiting to acquire processing slot.",
-                        "inferred_stall_stage": "ERROR_TIMEOUT",
-                        "primary_stall_reason_code": "ERROR_SEMAPHORE_TIMEOUT",
-                        "next_action_code": "ERROR_RETRY_SUGGESTED",
-                    }
-                    return
-                
-                try:
-                    # Check for cached results first
-                    if use_cache and phone in cached_results:
-                        conversation_text = "\\n".join(
-                            f"{getattr(row, 'creation_time', '')[:19]} {getattr(row, 'msg_from', '')}: {getattr(row, 'message', '')}"
-                            for row in conv_df.itertuples(index=False)
-                        )
-                        digest = compute_conversation_digest(conversation_text)
-                        
-                        cached_digest = conversation_digests.get(phone)
-                        if cached_digest == digest:
-                            logger.debug(f"Using cached result for phone {phone}")
-                            summaries[phone] = cached_results[phone]
-                            return
-                    
-                    # STEP 1: Run processors to generate context for LLM
-                    processor_results = {}
-                    if processor_runner is not None:
-                        try:
-                            # Convert phone to Series format as expected by processors
-                            lead_data = pd.Series({"phone": phone}, name=phone)
-                            
-                            # Process the conversation with all processors
-                            processor_results = processor_runner.run_all(
-                                lead_data=lead_data,
-                                conversation_data=conv_df,
-                                initial_results={}
-                            )
-                            
-                            logger.debug(f"ProcessorRunner results for {phone}: {list(processor_results.keys())}")
-                        except Exception as e:
-                            logger.error(f"Error running processors for {phone}: {e}", exc_info=True)
-                            processor_results = {}  # Use empty results on error
-                    
-                    # STEP 2: Call LLM for summarization
-                    llm_result = await summarizer.summarize(
-                        conv_df.copy(),
-                        temporal_flags=processor_results  # Pass processor results to LLM
-                    )
-                    
-                    # STEP 3: Validate and fix LLM output
-                    validated_result = yaml_validator.fix_yaml(
-                        llm_result, 
-                        temporal_flags=processor_results
-                    )
-                    
-                    if validated_result is None:
-                        logger.error(f"Summarization failed for phone {phone}")
+                    # Try to acquire semaphore with timeout to prevent deadlocks
+                    try:
+                        await asyncio.wait_for(semaphore.acquire(), timeout=300)
+                        logger.debug(f"Acquired semaphore for phone {phone} (attempt {attempt})")
+                    except asyncio.TimeoutError:
+                        logger.error(f"Timed out waiting for semaphore for phone {phone} (attempt {attempt})")
+                        if attempt < max_retries:
+                            logger.info(f"Retrying phone {phone} after {retry_delay}s (attempt {attempt+1}/{max_retries})")
+                            await asyncio.sleep(retry_delay)
+                            continue
+                        completed += 1
                         summaries[phone] = {
-                            "summary": "ERROR: LLM summarization failed.",
-                            "inferred_stall_stage": "ERROR_LLM_NONE",
-                            "primary_stall_reason_code": "ERROR_LLM_NONE",
-                            "next_action_code": "ERROR_LLM_NONE",
+                            "summary": "ERROR: Timed out waiting to acquire processing slot after retries.",
+                            "inferred_stall_stage": "ERROR_TIMEOUT",
+                            "primary_stall_reason_code": "ERROR_SEMAPHORE_TIMEOUT",
+                            "next_action_code": "ERROR_RETRY_FAILED",
                         }
-                        # Add processor results even if LLM failed
-                        summaries[phone].update(processor_results)
-                    else:
-                        # STEP 4: Merge processor results and LLM output
-                        combined_result = {**validated_result, **processor_results}
-                        
-                        # Add metadata
-                        combined_result[CLEANED_PHONE_COLUMN_NAME] = phone
-                        combined_result["conversation_digest"] = digest if 'digest' in locals() else ""
-                        combined_result["cache_status"] = "FRESH"
-                        
-                        summaries[phone] = combined_result
-                    
-                except (ApiError, ValidationError) as e:
-                    logger.error(f"API/Validation error for phone {phone}: {e}", exc_info=True)
-                    errors[phone] = str(e)
-                    summaries[phone] = {
-                        "summary": f"ERROR: {type(e).__name__} during processing.",
-                        "error_details": str(e),
-                        "inferred_stall_stage": "ERROR_PROCESSING",
-                        "primary_stall_reason_code": "ERROR_PROCESSING",
-                        "next_action_code": "ERROR_PROCESSING",
-                    }
-                except Exception as e:
-                    logger.error(f"Unexpected error for phone {phone}: {e}", exc_info=True)
-                    errors[phone] = f"Unexpected error: {e}"
-                    summaries[phone] = {
-                        "summary": f"ERROR: Unexpected {type(e).__name__}.",
-                        "error_details": str(e),
-                        "inferred_stall_stage": "ERROR_UNEXPECTED",
-                        "primary_stall_reason_code": "ERROR_UNEXPECTED",
-                        "next_action_code": "ERROR_UNEXPECTED",
-                    }
+                        return
+                    try:
+                        # Remove broken prompt logging; just run summarization as normal
+                        # Check for cached results first
+                        if use_cache and phone in cached_results:
+                            conversation_text = "\n".join(
+                                f"{getattr(row, 'creation_time', '')[:19]} {getattr(row, 'msg_from', '')}: {getattr(row, 'message', '')}"
+                                for row in conv_df.itertuples(index=False)
+                            )
+                            digest = compute_conversation_digest(conversation_text)
+                            cached_digest = conversation_digests.get(phone)
+                            if cached_digest == digest:
+                                logger.debug(f"Using cached result for phone {phone}")
+                                summaries[phone] = cached_results[phone]
+                                return
+                        # STEP 1: Run processors to generate context for LLM
+                        processor_results = {}
+                        if processor_runner is not None:
+                            try:
+                                lead_data = pd.Series({"phone": phone}, name=phone)
+                                processor_results = processor_runner.run_all(
+                                    lead_data=lead_data,
+                                    conversation_data=conv_df,
+                                    initial_results={}
+                                )
+                                logger.debug(f"ProcessorRunner results for {phone}: {list(processor_results.keys())}")
+                            except Exception as e:
+                                logger.error(f"Error running processors for {phone}: {e}", exc_info=True)
+                                processor_results = {}  # Use empty results on error
+                        # STEP 2: Call LLM for summarization
+                        llm_result = await summarizer.summarize(
+                            conv_df.copy(),
+                            temporal_flags=processor_results  # Pass processor results to LLM
+                        )
+                        # STEP 3: Validate and fix LLM output
+                        validated_result = yaml_validator.fix_yaml(
+                            llm_result, 
+                            temporal_flags=processor_results
+                        )
+                        if validated_result is None:
+                            logger.error(f"Summarization failed for phone {phone}")
+                            summaries[phone] = {
+                                "summary": "ERROR: LLM summarization failed.",
+                                "inferred_stall_stage": "ERROR_LLM_NONE",
+                                "primary_stall_reason_code": "ERROR_LLM_NONE",
+                                "next_action_code": "ERROR_LLM_NONE",
+                            }
+                            summaries[phone].update(processor_results)
+                        else:
+                            combined_result = {**validated_result, **processor_results}
+                            combined_result[CLEANED_PHONE_COLUMN_NAME] = phone
+                            combined_result["conversation_digest"] = digest if 'digest' in locals() else ""
+                            combined_result["cache_status"] = "FRESH"
+                            summaries[phone] = combined_result
+                        break  # Success, exit retry loop
+                    except (ApiError, ValidationError) as e:
+                        logger.error(f"API/Validation error for phone {phone}: {e}", exc_info=True)
+                        errors[phone] = str(e)
+                        summaries[phone] = {
+                            "summary": f"ERROR: {type(e).__name__} during processing.",
+                            "error_details": str(e),
+                            "inferred_stall_stage": "ERROR_PROCESSING",
+                            "primary_stall_reason_code": "ERROR_PROCESSING",
+                            "next_action_code": "ERROR_PROCESSING",
+                        }
+                        break
+                    except Exception as e:
+                        logger.error(f"Unexpected error for phone {phone}: {e}", exc_info=True)
+                        errors[phone] = f"Unexpected error: {e}"
+                        summaries[phone] = {
+                            "summary": f"ERROR: Unexpected {type(e).__name__}.",
+                            "error_details": str(e),
+                            "inferred_stall_stage": "ERROR_UNEXPECTED",
+                            "primary_stall_reason_code": "ERROR_UNEXPECTED",
+                            "next_action_code": "ERROR_UNEXPECTED",
+                        }
+                        break
+                    finally:
+                        semaphore.release()
+                        logger.debug(f"Released semaphore for phone {phone}")
                 finally:
-                    # Always release the semaphore
-                    semaphore.release()
-                    logger.debug(f"Released semaphore for phone {phone}")
-            finally:
-                # Always increment completion counter
-                completed += 1
-                if completed % 10 == 0 or completed == total:
-                    logger.info(f"Progress: {completed}/{total} ({completed/total:.1%})")
+                    completed += 1
+                    if completed % 10 == 0 or completed == total:
+                        logger.info(f"Progress: {completed}/{total} ({completed/total:.1%})")
         
         # Create and run tasks for all phone numbers
         tasks = []

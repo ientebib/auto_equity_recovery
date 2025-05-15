@@ -131,20 +131,6 @@ GLOBAL_FUNCTIONS = [
         }
     },
     {
-        "name": "detect_topup_template", 
-        "description": "Detect top-up template messages in top_up_may recipe",
-        "trigger": "Executed when top_up_may recipe is used",
-        "patterns": ["contains_top_up_template", "pre-approved loan", "credit message"],
-        "output_columns": FUNCTION_COLUMNS.get("detect_topup_template", []),
-        "config_params": {
-            "skip_topup_template_detection": {
-                "type": "bool",
-                "default": False,
-                "description": "Skip top-up template detection (top_up_may recipe)"
-            }
-        }
-    },
-    {
         "name": "count_consecutive_recovery_templates", 
         "description": "Count how many recovery templates were sent in sequence",
         "trigger": "Executed when recipe has template detection enabled",
@@ -175,11 +161,12 @@ RECIPE_FUNCTION_PATTERNS = {
         }
     },
     "top_up_may": {
-        "detect_topup_template": {
-            "description": "Detect top-up template messages",
-            "patterns": ["contains_top_up_template", "TOP_UP_TEMPLATE_PATTERNS"],
-            "output_columns": FUNCTION_COLUMNS.get("detect_topup_template", [])
-        }
+        # Remove the detect_topup_template entry
+        # "detect_topup_template": {
+        #     "description": "Detect top-up template messages",
+        #     "patterns": ["contains_top_up_template", "TOP_UP_TEMPLATE_PATTERNS"],
+        #     "output_columns": FUNCTION_COLUMNS.get("detect_topup_template", [])
+        # }
     }
 }
 

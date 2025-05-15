@@ -33,7 +33,15 @@ llm_config:
     summary_what_went_wrong:
       description: "Summary of what went wrong in the lead process."
       type: str
-  context_keys_from_python: []
+    transfer_context_analysis:
+      description: "Analysis of transfer context issues. Always 'N/A' for this recipe."
+      type: str
+  context_keys_from_python:
+    - "last_message_sender"
+    - "last_user_message_text"
+    - "last_kuna_message_text"
+    - "handoff_invitation_detected"
+    - "handoff_finalized"
 
 python_processors:
   - module: "lead_recovery.processors.metadata.MessageMetadataProcessor"
@@ -46,3 +54,9 @@ output_columns:
   - cleaned_phone
   - primary_stall_reason_code
   - summary_what_went_wrong
+  - transfer_context_analysis
+  - last_message_sender
+  - last_user_message_text
+  - last_kuna_message_text
+  - handoff_invitation_detected
+  - handoff_finalized

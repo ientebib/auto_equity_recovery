@@ -85,5 +85,4 @@ FROM leads_with_simulation lws
 JOIN latest_intent_per_email li ON lws.cleaned_email = li.cleaned_email AND li.rn = 1
 LEFT JOIN entered_handoff_leads hel ON lws.lead_id = hel.lead_id
 WHERE hel.lead_id IS NULL -- Keep only leads NOT found in entered_handoff_leads
-ORDER BY lead_created_at DESC, lws.lead_id
-limit 10;
+ORDER BY lead_created_at DESC, lws.lead_id;

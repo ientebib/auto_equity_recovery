@@ -101,4 +101,5 @@ def upload_to_google_sheets(csv_path: Path, sheet_id: str, worksheet_name: str, 
         raise
     except Exception as e:
         logger.error(f"An unexpected error occurred during Google Sheets upload: {e}", exc_info=True)
-        raise 
+        # Re-raise with original exception context preserved
+        raise Exception(f"Google Sheets upload failed: {e}") from e 

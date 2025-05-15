@@ -195,6 +195,11 @@ urllib3==2.4.0
     #   botocore
     #   requests
 
+# Additional dependencies for Google Sheets integration
+gspread>=5.10.0
+gspread-dataframe>=3.3.1
+google-auth>=2.22.0
+
 # The following packages are considered to be unsafe in a requirements file:
 # setuptools
 psutil>=5.9.0  # For memory usage tracking

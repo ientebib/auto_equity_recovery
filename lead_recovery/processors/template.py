@@ -15,13 +15,12 @@ class TemplateDetectionProcessor(BaseProcessor):
     
     GENERATED_COLUMNS = [
         "recovery_template_detected",
-        "topup_template_detected",
         "consecutive_recovery_templates_count"
     ]
     
     def _validate_params(self):
         """Validate processor-specific parameters."""
-        known_params = {"template_type", "skip_recovery_template", "skip_topup_template", "skip_consecutive_count"}
+        known_params = {"template_type", "skip_recovery_template", "skip_consecutive_count"}
         for param in self.params:
             if param not in known_params:
                 raise ValueError(f"Unknown parameter '{param}' for {self.__class__.__name__}")
@@ -44,13 +43,11 @@ class TemplateDetectionProcessor(BaseProcessor):
         # Initialize default result
         result = {
             "recovery_template_detected": False,
-            "topup_template_detected": False,
             "consecutive_recovery_templates_count": 0
         }
         
         # Get skip parameters with defaults
         skip_recovery_template = self.params.get("skip_recovery_template", False)
-        skip_topup_template = self.params.get("skip_topup_template", False)
         skip_consecutive_count = self.params.get("skip_consecutive_count", False)
         
         # Return early if no conversation data
@@ -78,16 +75,6 @@ class TemplateDetectionProcessor(BaseProcessor):
             if not skip_consecutive_count:
                 result["consecutive_recovery_templates_count"] = self._count_consecutive_recovery_templates(conversation_messages)
         
-        # Check for top-up templates if not skipped
-        if not skip_topup_template and template_type in ["all", "topup"]:
-            # Check all bot messages for top-up template
-            for msg in conversation_messages:
-                if msg.get('msg_from') == 'bot':
-                    message_text = msg.get('message', '')
-                    if self._detect_topup_template(message_text):
-                        result["topup_template_detected"] = True
-                        break
-        
         return result
     
     def _detect_recovery_template(self, message_text: str) -> bool:
@@ -113,35 +100,6 @@ class TemplateDetectionProcessor(BaseProcessor):
         message_text_lower = message_text.lower()
         for phrase in recovery_phrases:
             if phrase in message_text_lower:
-                return True
-        
-        return False
-    
-    def _detect_topup_template(self, message_text: str) -> bool:
-        """
-        Detect if a message is a top-up template.
-        
-        Args:
-            message_text: The text of the message to check
-            
-        Returns:
-            True if the message is a top-up template, False otherwise
-        """
-        # Top-up template regex patterns
-        topup_patterns = [
-            # Pattern for template message about pre-approved loan
-            r"(?i)template:.*pre\s*aprobado",
-            # Pattern for Hola + name + wave + pre-approved/credit message
-            r"(?i)¡?hola\s+[\w\s]+!?\s+:?wave:?.*crédito\s+pre\s*aprobado",
-            # Pattern for recognition of good payment behavior
-            r"(?i).*reconocer\s+tu\s+excelente\s+comportamiento\s+de\s+pago",
-            # Pattern for thanking for good client history
-            r"(?i).*agradecerte\s+por\s+mantener\s+un\s+buen\s+historial\s+como\s+cliente"
-        ]
-        
-        # Check for any of the top-up patterns
-        for pattern in topup_patterns:
-            if re.search(pattern, message_text):
                 return True
         
         return False

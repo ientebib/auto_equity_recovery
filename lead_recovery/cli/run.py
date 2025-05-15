@@ -78,7 +78,7 @@ def setup_environment() -> bool:
     return True
 
 def load_recipe_config(recipe_name: str, recipe_dir: Path, skip_processors: Optional[List[str]] = None,
-                      run_only_processors: Optional[List[str]] = None) -> RecipeMeta:
+                      run_only_processors: Optional[List[str]] = None, recipes_base_dir: Optional[Path] = None) -> RecipeMeta:
     """Load recipe configuration from meta.yml and apply processor filters.
     
     Args:
@@ -86,6 +86,7 @@ def load_recipe_config(recipe_name: str, recipe_dir: Path, skip_processors: Opti
         recipe_dir: Path to the recipe directory
         skip_processors: List of processor class names to skip
         run_only_processors: List of processor class names to run exclusively
+        recipes_base_dir: Optional custom base directory for recipes
         
     Returns:
         RecipeMeta object containing recipe configuration
@@ -93,7 +94,13 @@ def load_recipe_config(recipe_name: str, recipe_dir: Path, skip_processors: Opti
     try:
         # Load the recipe using RecipeLoader
         logger.info(f"Loading recipe configuration for: {recipe_name}")
-        recipe_loader = RecipeLoader()
+        if recipes_base_dir:
+            # Use custom recipes directory
+            recipe_loader = RecipeLoader(project_root=recipes_base_dir.parent, recipes_dir_name=recipes_base_dir.name)
+            logger.info(f"Using custom recipes directory: {recipes_base_dir}")
+        else:
+            # Use default RecipeLoader configuration
+            recipe_loader = RecipeLoader()
         recipe_meta = recipe_loader.load_recipe_meta(recipe_name)
         
         # Apply processor filtering based on CLI options
@@ -498,6 +505,7 @@ def run_pipeline(
     skip_summarize: bool = typer.Option(False, help="Skip summarizing conversations"),
     max_workers: Optional[int] = typer.Option(None, help="Max concurrent workers for OpenAI calls"),
     output_dir: Optional[str] = typer.Option(None, help="Override base output directory"),
+    recipes_dir: Optional[str] = typer.Option(None, help="Override recipes directory path (default: recipes/ in project root)"),
     use_cached_redshift: bool = typer.Option(True, help="Use cached Redshift data if available"),
     use_cache: bool = typer.Option(True, "--use-cache/--no-cache", help="Use summarization cache if available."),
     ignore_redshift_marker: bool = typer.Option(False, "--ignore-redshift-marker", help="Ignore existing Redshift marker and run query even if already run today."),
@@ -521,14 +529,24 @@ def run_pipeline(
     final_output_dir.mkdir(parents=True, exist_ok=True)
     
     # Find recipe directory and load recipe configuration
-    recipe_dir = Path(settings.PROJECT_ROOT) / "recipes" / recipe
+    if recipes_dir:
+        # Use the custom recipes directory provided by the user
+        recipes_base_dir = Path(recipes_dir)
+        recipe_dir = recipes_base_dir / recipe
+        logger.info(f"Using custom recipes directory: {recipes_base_dir}")
+    else:
+        # Use the default recipes directory
+        recipes_base_dir = Path(settings.PROJECT_ROOT) / "recipes"
+        recipe_dir = recipes_base_dir / recipe
+        logger.info(f"Using default recipes directory: {recipes_base_dir}")
+    
     if not recipe_dir.is_dir():
-        msg = f"Recipe '{recipe}' not found in {recipe_dir.parent}"
+        msg = f"Recipe '{recipe}' not found in {recipes_base_dir}"
         logger.error(msg)
         raise RecipeNotFoundError(msg)
     
     # Load and filter processors
-    recipe_meta = load_recipe_config(recipe, recipe_dir, skip_processors, run_only_processors)
+    recipe_meta = load_recipe_config(recipe, recipe_dir, skip_processors, run_only_processors, recipes_base_dir)
     
     # Set up SQL and prompt paths
     paths = setup_sql_and_prompt_paths(recipe_dir, recipe_meta)

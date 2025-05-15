@@ -76,10 +76,26 @@ class ProcessorRunner:
                     continue
                 
                 # Import the module dynamically
-                module = importlib.import_module(module_path)
+                try:
+                    module = importlib.import_module(module_path)
+                except ImportError as import_err:
+                    # Specific handling for module import failures
+                    logger.error(f"Failed to import processor module '{module_path}': {import_err}")
+                    raise RecipeConfigurationError(
+                        f"Processor module '{module_path}' could not be imported. "
+                        f"Check that the module exists and is correctly specified in meta.yml. Error: {import_err}"
+                    ) from import_err
                 
-                # Get the processor class
-                processor_class = getattr(module, class_name)
+                try:
+                    # Get the processor class
+                    processor_class = getattr(module, class_name)
+                except AttributeError as attr_err:
+                    # Specific handling for class not found in module
+                    logger.error(f"Processor class '{class_name}' not found in module '{module_path}': {attr_err}")
+                    raise RecipeConfigurationError(
+                        f"Processor class '{class_name}' not found in module '{module_path}'. "
+                        f"Check that the class name is correct in meta.yml. Error: {attr_err}"
+                    ) from attr_err
                 
                 # Ensure params is a dict (even if empty)
                 if params is None:
@@ -91,23 +107,34 @@ class ProcessorRunner:
                         f"Processor class {module_path}.{class_name} does not inherit from BaseProcessor."
                     )
                 
-                # STRICT ENFORCEMENT: Processors must follow BaseProcessor init signature
-                processor_instance = processor_class(
-                    recipe_config=self.recipe_config, 
-                    processor_params=params,
-                    global_config=self.global_config
-                )
-                processors.append(processor_instance)
-                logger.debug(f"Loaded processor: {processor_instance.__class__.__name__}")
+                try:
+                    # STRICT ENFORCEMENT: Processors must follow BaseProcessor init signature
+                    processor_instance = processor_class(
+                        recipe_config=self.recipe_config, 
+                        processor_params=params,
+                        global_config=self.global_config
+                    )
+                    processors.append(processor_instance)
+                    logger.debug(f"Loaded processor: {processor_instance.__class__.__name__}")
+                except TypeError as type_err:
+                    # Specific handling for initialization signature errors
+                    logger.error(f"Processor initialization error for '{module_path}.{class_name}': {type_err}")
+                    raise RecipeConfigurationError(
+                        f"Failed to initialize processor '{module_path}.{class_name}'. "
+                        f"Ensure its __init__ signature matches BaseProcessor. Error: {type_err}"
+                    ) from type_err
                 
+            except (RecipeConfigurationError, ImportError, AttributeError, TypeError):
+                # Let these specific errors propagate as they already have context
+                raise
             except Exception as e:
+                # Catch-all for any other unexpected errors
                 error_msg = (
-                    f"CRITICAL ERROR: Failed to initialize processor '{module_path}.{class_name}' "
-                    f"using the standard BaseProcessor signature. "
-                    f"Ensure its __init__ matches BaseProcessor and meta.yml params are correct. Error: {e}"
+                    f"CRITICAL ERROR: Failed to initialize processor '{module_path}.{class_name}'. "
+                    f"Unexpected error: {e}"
                 )
                 logger.error(error_msg, exc_info=True)
-                # Raise a specific error for processor initialization failures
+                # Raise with preserved stack trace
                 raise RecipeConfigurationError(
                     f"Failed to initialize configured processor '{module_path}.{class_name}'. Error: {e}"
                 ) from e
@@ -172,6 +199,9 @@ class ProcessorRunner:
             except Exception as e:
                 error_msg = f"Error in processor {processor_name} for lead {lead_id}: {e}"
                 logger.error(error_msg, exc_info=True)
+                # Store the error in current_results for debugging/reporting
+                error_key = f"{processor_name.lower()}_error"
+                current_results[error_key] = str(e)
                 # Continue to next processor without failing the entire pipeline
                 # This allows some processors to fail while still getting results from others
         

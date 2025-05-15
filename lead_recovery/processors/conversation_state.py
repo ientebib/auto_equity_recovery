@@ -1,18 +1,25 @@
 from typing import Dict, Any, List, Optional
 import pandas as pd
+import logging
 
 from .base import BaseProcessor
 from lead_recovery.processors.utils import convert_df_to_message_list
 from lead_recovery.processors.validation import ValidationProcessor
 from lead_recovery.processors.handoff import HandoffProcessor
 
+logger = logging.getLogger(__name__)
+
 class ConversationStateProcessor(BaseProcessor):
     """
     Processor for determining the overall state of a conversation.
     
     Analyzes the conversation to determine its current state based on
-    pre-validation and handoff detection. Uses other processors to make
-    its determination.
+    pre-validation and handoff detection.
+    
+    This processor respects the user's configuration choices:
+    - If ValidationProcessor was skipped in the recipe, pre-validation is assumed false
+    - If HandoffProcessor was skipped in the recipe, handoff invitation is assumed false
+    - Only uses the values calculated by processors that were explicitly included in the recipe
     """
     
     GENERATED_COLUMNS = [
@@ -32,6 +39,9 @@ class ConversationStateProcessor(BaseProcessor):
                 existing_results: Dict[str, Any]) -> Dict[str, Any]:
         """
         Determine the current state of a conversation.
+        
+        Respects processor configuration - will not run additional processors if they
+        were not included in the recipe configuration.
         
         Args:
             lead_data: Series containing lead information
@@ -65,31 +75,24 @@ class ConversationStateProcessor(BaseProcessor):
         # Default state
         state = "PRE_VALIDACION"
         
-        # Check if we already have pre_validacion_detected in existing_results
-        if "pre_validacion_detected" in existing_results:
-            pre_validacion_detected = existing_results["pre_validacion_detected"]
-        else:
-            # Use ValidationProcessor to check for pre-validation
-            validation_processor = ValidationProcessor(self.recipe_config, {})
-            validation_result = validation_processor.process(lead_data, conversation_data, {})
-            pre_validacion_detected = validation_result.get("pre_validacion_detected", False)
+        # Check if pre_validacion_detected exists in existing_results
+        # If it doesn't exist, assume pre-validation was not detected (or the processor was skipped)
+        pre_validacion_detected = existing_results.get("pre_validacion_detected", False)
         
         # Update state if pre-validation detected
         if pre_validacion_detected:
             state = "POST_VALIDACION"
+            logger.debug("Setting conversation state to POST_VALIDACION based on pre_validacion_detected=True")
         
-        # Check if we already have handoff_invitation_detected in existing_results
-        if "handoff_invitation_detected" in existing_results:
-            handoff_invitation_detected = existing_results["handoff_invitation_detected"]
-        else:
-            # Use HandoffProcessor to check for handoff invitation
-            handoff_processor = HandoffProcessor(self.recipe_config, {})
-            handoff_result = handoff_processor.process(lead_data, conversation_data, {})
-            handoff_invitation_detected = handoff_result.get("handoff_invitation_detected", False)
+        # Check if handoff_invitation_detected exists in existing_results
+        # If it doesn't exist, assume handoff invitation was not detected (or the processor was skipped)
+        handoff_invitation_detected = existing_results.get("handoff_invitation_detected", False)
         
         # If handoff invitation was detected, override to HANDOFF state regardless of pre-validation
         if handoff_invitation_detected:
             state = "HANDOFF"
+            logger.debug("Setting conversation state to HANDOFF based on handoff_invitation_detected=True")
         
+        logger.info(f"Determined conversation state: {state}")
         result["conversation_state"] = state
         return result 

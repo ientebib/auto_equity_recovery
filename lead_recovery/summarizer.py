@@ -422,5 +422,5 @@ class ConversationSummarizer:
             raise
         except Exception as e:  # Catch other unexpected errors
             logger.exception("Failed to summarise conversation: %s", e)
-            # Wrap unknown errors
+            # Wrap unknown errors - using 'from e' to preserve the original stack trace
             raise ApiError(f"Unexpected error during summarization: {e}") from e

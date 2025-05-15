@@ -41,11 +41,8 @@ python_processors:
   - module: "lead_recovery.processors.metadata.MessageMetadataProcessor"
     params:
       max_message_length: 150
-  - module: "lead_recovery.processors.template.TemplateDetectionProcessor"
-    params:
-      template_type: "topup"
-      skip_recovery_template: true
-      skip_consecutive_count: true
+  # Removed or updated TemplateDetectionProcessor since top-up template detection is no longer available
+  # If you have migrated template detection to another processor, configure it here
 
 output_columns:
   - cleaned_phone
@@ -61,4 +58,4 @@ output_columns:
   - next_action_context
   - suggested_message_es
   - transfer_context_analysis
-  - topup_template_detected 
+  # Removed topup_template_detected from output columns 

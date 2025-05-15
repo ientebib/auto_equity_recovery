@@ -18,13 +18,29 @@ _modules: _List[str] = [
     "config",
     "db_clients",
     "utils",
-    "summarizer",
-    "reporting",
     "recipe_loader",
+    "constants",
+    "recipe_schema",
+    "fs",
+    "gsheets",
+    "python_flags_manager",
+    "cache",
+    "analysis",
+    "yaml_validator",
+    "reporting",
+    "processors",
+    "processor_runner",
+    "exceptions",
     "cli",
+    "summarizer",
+    "python_flags",
+    "summarizer_helpers"
 ]
 
-globals().update({name: _import(f"lead_recovery.{name}") for name in _modules})
+for _module in _modules:
+    globals()[_module] = _import("lead_recovery." + _module)
+    if isinstance(globals()[_module], _ModuleType):
+        globals()[_module].__package__ = "lead_recovery"
 
 # Directly import functions from modules that were previously re-exported through pipeline.py
 from .fs import update_link, ensure_dir
@@ -32,27 +48,9 @@ from .gsheets import upload_to_google_sheets
 from .cache import normalize_phone
 from .analysis import run_summarization_step
 
-# Import handoff detection functions
-from .python_flags import (
-    handoff_invitation,
-    handoff_started,
-    handoff_finalized,
-    analyze_handoff_process,
-    detect_human_transfer,
-    detect_recovery_template,
-    detect_topup_template,
-    count_consecutive_recovery_templates,
-    extract_message_metadata
-)
-
 __all__: _List[str] = _modules + [
     "run_summarization_step", 
     "upload_to_google_sheets", 
     "normalize_phone", 
-    "update_link",
-    # Add handoff detection functions
-    "handoff_invitation",
-    "handoff_started",
-    "handoff_finalized",
-    "analyze_handoff_process"
-] 
+    "update_link"
+]

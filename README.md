@@ -39,6 +39,7 @@ python -m lead_recovery.cli.main run --recipe <recipe_name>
 ### Essential CLI Options
 
 * `--recipe <recipe_name>` (required): Specifies which recipe to run
+* `--recipes-dir <path>`: Override the default recipes directory location (default: recipes/ in project root)
 * `--skip-redshift`: Skip fetching data from Redshift (use existing leads.csv)
 * `--skip-bigquery`: Skip fetching conversations from BigQuery (use existing conversations.csv)
 * `--skip-summarize`: Skip LLM summarization (Python processors only)
@@ -47,6 +48,37 @@ python -m lead_recovery.cli.main run --recipe <recipe_name>
 * `--run-only-processor <ProcessorClassName>`: Run only specific processor(s)
 
 For a complete guide to execution options, see [documentation/execution_guide.md](documentation/execution_guide.md).
+
+### Google Sheets Integration
+
+The pipeline supports automatic uploading of results to Google Sheets. To use this feature:
+
+1. **Enable required dependencies**:
+   The required dependencies (`gspread`, `gspread-dataframe`, and `google-auth`) are included in the project requirements.
+
+2. **Set up Google credentials**:
+   - Create a Google Cloud service account with access to Google Sheets API
+   - Download the service account JSON key file
+   - Set the path to this file in your `.env`:
+     ```
+     GOOGLE_CREDENTIALS_PATH=/path/to/your/google-credentials.json
+     ```
+   - Share your target Google Sheet with the service account email (giving it Editor access)
+
+3. **Configure in recipe's meta.yml**:
+   ```yaml
+   gsheets_config:
+     sheet_id: "your-google-sheet-id-here"
+     worksheet_name: "YourWorksheetName"  # Default: sheet's first tab
+   ```
+
+4. **Run the recipe normally**:
+   ```bash
+   python -m lead_recovery.cli.main run --recipe <recipe_name>
+   ```
+   The results will be automatically uploaded to the specified Google Sheet after processing.
+
+The Sheet ID is the long string in your sheet's URL: `https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID_HERE/edit`
 
 ## Recipe Structure
 
@@ -152,15 +184,16 @@ For more detailed information, refer to the following documentation:
 * [Python Processors Guide](documentation/python_processors_guide.md) - Documentation for all processors
 * [Recipe Creation Guide](RECIPE_CREATION_GUIDE.md) - How to create and configure recipes
 * [PROMPTING_AND_YAML_GUIDE.md](PROMPTING_AND_YAML_GUIDE.md) - Guide to LLM prompting and configuration
+* [Codebase Maintenance](documentation/codebase_maintenance.md) - Guide for maintaining and cleaning up the codebase
 
 ## Debugging Insights (Key Learnings)
 
-*   **CLI Flags are Key**: Use `--skip-...` flags (e.g., `--skip-redshift`, `--skip-metadata-extraction`, `--skip-temporal-flags`) to control which parts of the pipeline run and which Python flags are calculated. These are the primary way to toggle Python flag calculations.
+*   **CLI Flags are Key**: Use `--skip-processor` flags (e.g., `--skip-processor TemporalProcessor`, `--skip-processor MessageMetadataProcessor`) to control which processors run. These are the primary way to control which columns are calculated.
 *   **`meta.yml` Roles**: Understand the distinct roles within `meta.yml`:
-    *   `expected_yaml_keys`: **Only** for validating the output requested from the LLM in `prompt.txt`. Python flags *never* go here.
-    *   `output_columns`: Defines the **final columns** in the output CSV. List all desired columns here (lead info, LLM fields, desired Python flags).
-*   **Python Flags vs. LLM Output**: Python flags (metadata, temporal, detection) are calculated separately from the LLM analysis. Their appearance in the final output depends on whether they are listed in `output_columns`.
-*   **Skipped Python Flags & Output**: If a Python flag calculation is skipped via a CLI flag, but its column is still listed in `output_columns`, the column *will appear* in the CSV (often with N/A or empty values).
+    *   `expected_yaml_keys`: **Only** for validating the output requested from the LLM in `prompt.txt`. Python-generated columns *never* go here.
+    *   `output_columns`: Defines the **final columns** in the output CSV. List all desired columns here (lead info, LLM fields, desired Python-generated columns).
+*   **Processors vs. LLM Output**: Processors generate columns independently from the LLM analysis. The columns they generate appear in the final output only if listed in `output_columns`.
+*   **Skipped Processors & Output**: If a processor is skipped via a CLI flag, but its columns are still listed in `output_columns`, the columns *will appear* in the CSV (often with N/A or empty values).
 *   **Guides**: Refer to `PROMPTING_AND_YAML_GUIDE.md` and `RECIPE_CREATION_GUIDE.md` for detailed configuration and creation instructions.
 
 ## Recipe Creation and Standardization
@@ -252,40 +285,34 @@ Use these tools to ensure consistency when creating new recipes:
 
 The Lead Recovery system allows control over which Python-calculated flags are generated.
 
-*   **Control via CLI**: The primary way to enable/disable Python flag calculations is through the CLI `--skip-...` arguments (e.g., `--skip-temporal-flags`, `--skip-metadata-extraction`). These flags are passed down through the pipeline.
+*   **Control via CLI**: The primary way to enable/disable processors is through the CLI `--skip-processor` and `--run-only-processor` arguments (e.g., `--skip-processor TemporalProcessor`, `--run-only-processor HandoffProcessor`). These processor-level controls replace the older flag-based approach.
 *   **Output Control via `meta.yml`**: The `output_columns` section in a recipe's `meta.yml` determines which columns ultimately appear in the final CSV report, and in what order. This list should include any desired Python-generated columns.
-*   **Interaction**: If a Python flag's calculation is skipped using a CLI flag, but its column name remains listed in `output_columns`, the column will still be present in the output CSV, typically containing default values (like N/A or empty strings). To completely remove a Python flag's column from the output, remove its name from the `output_columns` list in `meta.yml`.
-*   **Management**: The `lead-recovery update-recipe-columns` command can help synchronize the `output_columns` in `meta.yml` with the flags expected to be active (though CLI overrides at runtime still take precedence for *calculation*).
+*   **Interaction**: If a processor is skipped using the CLI, any columns it would have generated will still be present in the output CSV if listed in `output_columns`, typically containing default values (like N/A or empty strings). To completely remove a column from the output, remove its name from the `output_columns` list in `meta.yml`.
+*   **Management**: The `lead-recovery update-recipe-columns` command helps synchronize the `output_columns` in `meta.yml` with the columns expected from active processors.
 
-### Configuration in meta.yml (Reference for `update-recipe-columns`)
+### Configuration in meta.yml 
 
-While CLI flags control the *runtime calculation*, the `python_flags` section in `meta.yml` might be used by tools like `update-recipe-columns` to manage the default state of `output_columns`. It serves as a reference for the intended default configuration.
+Processors are configured in the `python_processors` section of the `meta.yml` file. Each processor may have its own parameters that control its behavior:
 
 ```yaml
-# Python Flags Configuration (Used as reference, CLI flags override runtime calculation)
-python_flags:
-  # Temporal flags
-  skip_temporal_flags: false
-  skip_detailed_temporal: false
-  skip_hours_minutes: false
-  skip_reactivation_flags: false
-  skip_timestamps: false
-  skip_user_message_flag: false
-  
-  # Message metadata
-  skip_metadata_extraction: false
-  
-  # Handoff detection
-  skip_handoff_detection: false
-  skip_handoff_invitation: false
-  skip_handoff_started: false
-  skip_handoff_finalized: false
-  
-  # Other detections
-  skip_human_transfer: false
-  skip_recovery_template_detection: false
-  skip_topup_template_detection: true  # Skip this specific function
-  skip_consecutive_templates_count: false
+# Python Processors Configuration
+python_processors:
+  - module: "lead_recovery.processors.temporal.TemporalProcessor"
+    params:
+      timezone: "America/Mexico_City"
+  - module: "lead_recovery.processors.metadata.MessageMetadataProcessor"
+    params:
+      max_message_length: 150
+  - module: "lead_recovery.processors.handoff.HandoffProcessor"
+    params: {}
+  - module: "lead_recovery.processors.template.TemplateDetectionProcessor"
+    params:
+      template_type: "recovery"
+      skip_consecutive_count: false
+  - module: "lead_recovery.processors.validation.ValidationProcessor"
+    params: {}
+  - module: "lead_recovery.processors.conversation_state.ConversationStateProcessor"
+    params: {}
 ```
 
 ### Output Columns in meta.yml
@@ -302,7 +329,7 @@ output_columns:
   - summary
   - primary_stall_reason_code
   
-  # Python-generated columns (presence determined by this list, values depend on CLI skip flags)
+  # Python-generated columns (presence determined by this list, values depend on active processors)
   - last_message_sender
   - handoff_finalized
   - HOURS_MINUTES_SINCE_LAST_MESSAGE
@@ -310,7 +337,7 @@ output_columns:
 
 ### Update Recipe Columns CLI Command
 
-A new CLI command has been added to update a recipe's `meta.yml` file with the correct Python flag columns based on enabled/disabled flags:
+A CLI command is available to update a recipe's `meta.yml` file with the correct columns based on the configured processors:
 
 ```bash
 lead-recovery update-recipe-columns <recipe_name>

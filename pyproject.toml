@@ -40,6 +40,9 @@ dependencies = [
     "pyarrow",
     "pyyaml",
     "streamlit>=1.0",
+    "gspread",
+    "gspread-dataframe",
+    "google-auth",
 ]
 
 [project.optional-dependencies]

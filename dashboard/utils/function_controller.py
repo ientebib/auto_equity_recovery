@@ -399,9 +399,6 @@ class FunctionController:
                 if func_name == "detect_recovery_template" and not state["enabled"]:
                     cli_args.append("--skip-recovery-template-detection")
                 
-                if func_name == "detect_topup_template" and not state["enabled"]:
-                    cli_args.append("--skip-topup-template-detection")
-                
                 if func_name == "count_consecutive_recovery_templates" and not state["enabled"]:
                     cli_args.append("--skip-consecutive-templates-count")
         

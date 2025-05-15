@@ -56,9 +56,9 @@ class RecipeLoader:
         if recipe_dir.resolve() not in resolved_path.parents and resolved_path != recipe_dir.resolve():
              # This check might be too strict if symlinks legitimately point outside,
              # but for simple recipe assets, it's a good safety measure.
-             # Consider if this strictness is needed or if just `(recipe_dir / file_name).exists()` is enough later.
-             # For now, let's assume files are directly within or in subfolders of recipe_dir.
-             pass # Simplified: we'll let existence checks happen when file is actually used.
+             raise RecipeConfigurationError(
+                 f"Security violation: Resolved path '{resolved_path}' is outside the recipe directory '{recipe_dir.resolve()}'."
+             )
 
         return resolved_path # Return the resolved, absolute path
 

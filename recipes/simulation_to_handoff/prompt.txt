@@ -23,7 +23,7 @@ HOURS_MINUTES_SINCE_LAST_MESSAGE: {HOURS_MINUTES_SINCE_LAST_MESSAGE}         # F
 
 # General State Flags (Calculados por Python)
 NO_USER_MESSAGES_EXIST: {NO_USER_MESSAGES_EXIST}               # True si el usuario NUNCA ha enviado un mensaje.
-HUMAN_TRANSFER: {human_transfer_detected_by_python} # True if Python detect_human_transfer function returned True.
+HUMAN_TRANSFER: {human_transfer} # True if Python detect_human_transfer function returned True.
 
 # --- Message Metadata ---
 LAST_MESSAGE_SENDER: {last_message_sender} # 'user' or 'kuna'
@@ -101,8 +101,8 @@ Analiza la conversación para determinar con precisión para el equipo de recupe
 
 ## ANÁLISIS DE TRANSFERENCIA A HUMANO
 *   `transfer_context_analysis`:
-    *   **Si `{human_transfer_detected_by_python}` es `True`:** Analiza `last_user_message_text` (el mensaje JUSTO ANTES de la transferencia). Explica concisamente (máx 20 palabras) por qué la IA inicial probablemente falló.
-    *   **Si `{human_transfer_detected_by_python}` es `False`:** Pon "N/A".
+    *   **Si `{human_transfer}` es `True`:** Analiza `last_user_message_text` (el mensaje JUSTO ANTES de la transferencia). Explica concisamente (máx 20 palabras) por qué la IA inicial probablemente falló.
+    *   **Si `{human_transfer}` es `False`:** Pon "N/A".
 
 ## DIMENSIONES DE ANÁLISIS PARA CAMPOS YAML
 
@@ -239,4 +239,3 @@ transfer_context_analysis: "<Análisis si HUMAN_TRANSFER_DETECTED_BY_PYTHON=True
 next_action_code: "<Código de Taxonomía 4>"
 next_action_context: "<Contexto breve opcional, o vacío>"
 suggested_message_es: "<Mensaje re-enganche Español si aplica, o vacío>"
-thought_process: "<Explica aquí tu razonamiento detallado paso a paso. INICIA mencionando los valores clave de los flags Python (CONVERSATION_STATE_PY, handoff flags, temporal flags relevantes). Luego, detalla cómo llegaste a inferred_stall_stage, primary_stall_reason_code, prior_reactivation_attempt_count (si aplica), reactivation_status_assessment, y finalmente, cómo la jerarquía de next_action_code te llevó a tu decisión final. Referencia mensajes específicos si es necesario.>"

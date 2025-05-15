@@ -31,6 +31,7 @@ python -m lead_recovery.cli.main run --recipe simulation_to_handoff
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `--recipe` | TEXT | *Required* | Recipe name (folder name under recipes/) |
+| `--recipes-dir` | TEXT | None | Override recipes directory path (default: recipes/ in project root) |
 | `--skip-redshift / --no-skip-redshift` | FLAG | `--no-skip-redshift` | Skip fetching leads from Redshift |
 | `--skip-bigquery / --no-skip-bigquery` | FLAG | `--no-skip-bigquery` | Skip fetching conversations from BigQuery |
 | `--skip-summarize / --no-skip-summarize` | FLAG | `--no-skip-summarize` | Skip summarizing conversations with LLM |
@@ -161,6 +162,14 @@ Use existing data files without fetching new data:
 python -m lead_recovery.cli.main run --recipe simulation_to_handoff --skip-redshift --skip-bigquery
 ```
 
+### Using a Custom Recipes Directory
+
+Run a recipe from a non-standard location:
+
+```bash
+python -m lead_recovery.cli.main run --recipe simulation_to_handoff --recipes-dir /path/to/custom/recipes
+```
+
 ### Skip LLM Summarization (Processor-Only Mode)
 
 Run only the Python processors without calling the LLM:
@@ -189,7 +198,7 @@ python -m lead_recovery.cli.main run --recipe simulation_to_handoff --run-only-p
 
 ### Common Issues
 
-1. **Recipe Not Found**: Ensure the recipe name matches a directory under the `recipes/` folder.
+1. **Recipe Not Found**: Ensure the recipe name matches a directory under the `recipes/` folder or use the `--recipes-dir` option to specify a custom recipes directory location.
 
 2. **Missing Required Files**: Verify the recipe has all required files (meta.yml, prompt.txt, bigquery.sql).
 

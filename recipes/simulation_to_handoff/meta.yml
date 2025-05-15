@@ -9,7 +9,7 @@ data_input:
   conversation_sql_file_bigquery: "simulation_to_handoff_bigquery.sql"
 
 llm_config:
-  prompt_file: "simulation_to_handoff_prompt_v12.txt"
+  prompt_file: "prompt.txt"
   expected_llm_keys:
     summary:
       description: "LLM generated summary."
@@ -92,8 +92,11 @@ llm_config:
     suggested_message_es:
       description: "Suggested message in Spanish if applicable."
       type: str
-    thought_process:
-      description: "Detailed reasoning process."
+    conversation_digest:
+      description: "Unique hash or digest of the conversation for caching or tracking."
+      type: str
+    last_message_ts:
+      description: "Timestamp of the last message in the conversation."
       type: str
   context_keys_from_python: [
     "conversation_state",
@@ -171,4 +174,4 @@ output_columns:
   - LAST_USER_MESSAGE_TIMESTAMP_TZ
   - LAST_MESSAGE_TIMESTAMP_TZ
   - NO_USER_MESSAGES_EXIST
-  - thought_process 
+  - conversation_digest 

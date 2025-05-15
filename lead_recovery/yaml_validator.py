@@ -19,7 +19,17 @@ class YamlValidator:
             meta_config: Configuration dictionary from the recipe's meta.yml
         """
         self.meta_config = meta_config or {}
-        self.expected_yaml_keys = set(self.meta_config.get('expected_yaml_keys', []))
+        print(f"DEBUG: YamlValidator meta_config keys: {list(self.meta_config.keys())}")
+        logger.info(f"YamlValidator initialized with meta_config keys: {list(self.meta_config.keys())}")
+        # Support both old and new schema
+        if 'expected_yaml_keys' in self.meta_config:
+            self.expected_yaml_keys = set(self.meta_config.get('expected_yaml_keys', []))
+        elif 'expected_llm_keys' in self.meta_config:
+            self.expected_yaml_keys = set(self.meta_config['expected_llm_keys'].keys())
+        elif 'llm_config' in self.meta_config and 'expected_llm_keys' in self.meta_config['llm_config']:
+            self.expected_yaml_keys = set(self.meta_config['llm_config']['expected_llm_keys'].keys())
+        else:
+            self.expected_yaml_keys = set()
         self.validation_enums = self.meta_config.get('validation_enums', {})
         
     def validate_yaml(self, parsed_data: Dict[str, Any]) -> List[str]:
@@ -44,7 +54,7 @@ class YamlValidator:
             if extra_keys:
                 logger.warning("Found extra keys in YAML output: %s", extra_keys)
         else:
-            logger.warning("No expected_yaml_keys provided for validation. Skipping key check.")
+            logger.warning("No expected_yaml_keys or expected_llm_keys provided for validation. Skipping key check.")
 
         # Enum value validation
         for enum_key, allowed_values_list in self.validation_enums.items():
