@@ -29,7 +29,6 @@ _modules: _List[str] = [
     "recipe_schema",
     "fs",
     "gsheets",
-    "python_flags_manager",
     "cache",
     "analysis",
     "yaml_validator",
@@ -39,7 +38,6 @@ _modules: _List[str] = [
     "exceptions",
     "cli",
     "summarizer",
-    "python_flags",
     "summarizer_helpers"
 ]
 

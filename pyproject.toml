@@ -43,6 +43,7 @@ dependencies = [
     "gspread",
     "gspread-dataframe",
     "google-auth",
+    "ruamel.yaml>=0.18",
 ]
 
 [project.optional-dependencies]

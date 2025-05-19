@@ -19,7 +19,6 @@ class YamlValidator:
             meta_config: Configuration dictionary from the recipe's meta.yml
         """
         self.meta_config = meta_config or {}
-        print(f"DEBUG: YamlValidator meta_config keys: {list(self.meta_config.keys())}")
         logger.info(f"YamlValidator initialized with meta_config keys: {list(self.meta_config.keys())}")
         # Support both old and new schema
         if 'expected_yaml_keys' in self.meta_config:
@@ -30,7 +29,16 @@ class YamlValidator:
             self.expected_yaml_keys = set(self.meta_config['llm_config']['expected_llm_keys'].keys())
         else:
             self.expected_yaml_keys = set()
-        self.validation_enums = self.meta_config.get('validation_enums', {})
+        # Extract validation_enums if present, else auto-extract from llm_config.expected_llm_keys
+        if 'validation_enums' in self.meta_config:
+            self.validation_enums = self.meta_config['validation_enums']
+        else:
+            self.validation_enums = {}
+            llm_cfg = self.meta_config.get('llm_config', {})
+            expected_llm_keys = llm_cfg.get('expected_llm_keys', {})
+            for key, cfg in expected_llm_keys.items():
+                if cfg.get('enum_values'):
+                    self.validation_enums[key] = cfg['enum_values']
         
     def validate_yaml(self, parsed_data: Dict[str, Any]) -> List[str]:
         """Validate parsed YAML data against expected keys and enums.

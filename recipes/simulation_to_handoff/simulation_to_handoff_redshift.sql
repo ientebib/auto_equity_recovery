@@ -7,7 +7,7 @@ WITH simulation_lead_ids AS (
     WHERE
         ld.product = 'f079451e-04dd-4741-b7e0-ee6ddedc6b7d'
         -- Changed from -7 to -90 to fetch the last 90 days
-        AND ld.create_date >= DATEADD(day, -14, CURRENT_DATE)
+        AND ld.create_date >= DATEADD(day, -20, CURRENT_DATE)
         AND la.field = 'SIMULATION' AND la.new_value IS NOT NULL
 ),
 -- Get the full lead data with cleaned emails, for the leads that matter

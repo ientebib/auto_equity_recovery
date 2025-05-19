@@ -1,65 +1,106 @@
 recipe_name: "fede_abril_preperfilamiento"
-version: "1.0"
-description: "Recipe for analyzing lead engagement in the active Fede Abril Re-engagement campaign, using leads.csv as input."
+version: "v17"
+description: "Recipe for analyzing leads that reached simulation but not handoff (Time Aware)"
+recipe_schema_version: 2
 
-# Data Input Configuration
 data_input:
   lead_source_type: csv
   csv_config:
     csv_file: "leads.csv"
   conversation_sql_file_bigquery: "bigquery.sql"
 
-# LLM Configuration
 llm_config:
   prompt_file: "prompt.txt"
   expected_llm_keys:
-    lead_name:
-      description: "Name of the lead extracted from conversation."
-      type: str
     summary:
-      description: "Estado + acción summary."
+      description: "LLM generated summary of the conversation."
       type: str
     current_engagement_status:
-      description: "Current engagement status of the lead."
+      description: "LLM assessment of the lead's current engagement level."
       type: str
-    follow_up_attempts:
-      description: "Number of follow-up attempts."
-      type: int
+      enum_values: [
+        "IGNORED_INITIAL_CONTACT",
+        "EXPLICIT_DISINTEREST",
+        "TECHNICAL_ISSUE_REPORTED",
+        "KUNA_PENDING_RESPONSE",
+        "STALLED_AFTER_RESPONSE",
+        "USER_PENDING_RESPONSE",
+        "ENGAGED_ACTIVE_CONVO",
+        "N/A"
+      ]
+    primary_stall_reason_code:
+      description: "Root cause for the stall, as determined by the LLM."
+      type: str
+      enum_values: [
+        "NUNCA_RESPONDIO", "FINANCIAMIENTO_ACTIVO", "VEHICULO_ANTIGUO_KM", "NO_PROPIETARIO", "VIN_EXTRANJERO", "ZONA_NO_CUBIERTA", "USUARIO_SIN_AUTO", "RECHAZADO_POR_KUNA", "PRODUCTO_INCORRECTO_COMPRADOR", "OTRO_PROCESO_DE_NEGOCIO", "DESINTERES_EXPLICITO", "ADEUDO_VEHICULAR_MULTAS", "PROBLEMA_SEGUNDA_LLAVE", "PROBLEMA_TERMINOS", "ERROR_PROCESO_INTERNO", "PROCESO_EN_CURSO", "GHOSTING", "OTRO"
+      ]
     next_action_code:
-      description: "Code indicating next action to take."
+      description: "Recommended next action for the lead."
       type: str
+      enum_values: [
+        "LLAMAR_LEAD_NUNCA_RESPONDIO",
+        "CERRAR_CASO",
+        "ESCALAR_CASO_A_HUMANO",
+        "RESPONDER_AL_CLIENTE",
+        "MONITOREAR_CONVERSACION",
+        "PROGRAMAR_RECONTACTO_AUTOMATICO",
+        "PROGRAMAR_RECONTACTO_ESPECIAL",
+        "REVISAR_MANUALMENTE"
+      ]
+    follow_up_attempts:
+      description: "Number of follow-up attempts made or suggested (0 if not applicable)."
+      type: int
     next_action_context:
-      description: "Context for next action."
+      description: "Brief context or reason for the suggested next_action_code."
       type: str
-    suggested_message_es:
-      description: "Suggested message in Spanish."
-      type: str
-  context_keys_from_python: []
+  context_keys_from_python: [
+    "HOY_ES",
+    "HOURS_MINUTES_SINCE_LAST_USER_MESSAGE",
+    "HOURS_MINUTES_SINCE_LAST_MESSAGE",
+    "NO_USER_MESSAGES_EXIST",
+    "human_transfer",
+    "last_message_sender"
+  ]
 
-# Python Processors
 python_processors:
+  - module: "lead_recovery.processors.temporal.TemporalProcessor"
+    params:
+      timezone: "America/Mexico_City"
   - module: "lead_recovery.processors.metadata.MessageMetadataProcessor"
     params:
       max_message_length: 150
   - module: "lead_recovery.processors.handoff.HandoffProcessor"
     params: {}
+  - module: "lead_recovery.processors.template.TemplateDetectionProcessor"
+    params:
+      template_type: "recovery"
+  - module: "lead_recovery.processors.validation.ValidationProcessor"
+    params: {}
+  - module: "lead_recovery.processors.conversation_state.ConversationStateProcessor"
+    params: {}
 
 output_columns:
   - cleaned_phone
-  - lead_name
-  - cache_status
+  - name
+  - email
+  - HOY_ES
+  - HOURS_MINUTES_SINCE_LAST_USER_MESSAGE
+  - HOURS_MINUTES_SINCE_LAST_MESSAGE
+  - NO_USER_MESSAGES_EXIST
+  - human_transfer
+  - last_message_sender
   - summary
   - current_engagement_status
-  - follow_up_attempts
-  - last_message_sender
-  - last_user_message_text
-  - last_kuna_message_text
+  - primary_stall_reason_code
   - next_action_code
+  - follow_up_attempts
   - next_action_context
-  - suggested_message_es
-  - transfer_context_analysis
   - handoff_invitation_detected
   - handoff_response
   - handoff_finalized
-
-# --- End of file --- 
+  - last_user_message_text
+  - last_kuna_message_text
+  # Meta data at the end
+  - last_user_message_text
+  - last_kuna_message_text
+  - last_message_sender 

@@ -29,7 +29,6 @@ from .exceptions import ApiError, LeadRecoveryError, RecipeConfigurationError, V
 from .fs import update_link
 from .gsheets import upload_to_google_sheets
 from .processor_runner import ProcessorRunner
-from .python_flags_manager import get_python_flag_columns
 from .reporting import export_data, to_csv
 from .summarizer import ConversationSummarizer
 from .utils import log_memory_usage, optimize_dataframe
@@ -160,7 +159,13 @@ async def run_summarization_step(
             logger.error(f"Error initializing ProcessorRunner: {e}", exc_info=True)
             raise RecipeConfigurationError(f"Failed to initialize ProcessorRunner: {e}") from e
     
-    # Calculate effective skip flags
+    # Use output_columns from meta_config if present
+    if meta_config and 'output_columns' in meta_config:
+        output_columns = meta_config['output_columns']
+    else:
+        output_columns = None  # Or set a sensible default if needed
+    
+    # Calculate effective skip flags (can be used for processor logic, but not for columns)
     effective_skip_temporal_flags = (
         skip_detailed_temporal_calc and
         skip_hours_minutes and
@@ -169,28 +174,7 @@ async def run_summarization_step(
         skip_user_message_flag
     )
     
-    # Get columns to include in output
-    python_flag_columns = get_python_flag_columns(
-        skip_temporal_flags=effective_skip_temporal_flags,
-        skip_metadata_extraction=skip_metadata_extraction,
-        skip_handoff_detection=skip_handoff_detection,
-        skip_human_transfer=skip_human_transfer,
-        skip_recovery_template_detection=skip_recovery_template_detection,
-        skip_consecutive_templates_count=skip_consecutive_templates_count,
-        skip_handoff_invitation=skip_handoff_invitation,
-        skip_handoff_started=skip_handoff_started,
-        skip_handoff_finalized=skip_handoff_finalized,
-        skip_detailed_temporal=skip_detailed_temporal_calc,
-        skip_hours_minutes=skip_hours_minutes,
-        skip_reactivation_flags=skip_reactivation_flags,
-        skip_timestamps=skip_timestamps,
-        skip_user_message_flag=skip_user_message_flag,
-        skip_pre_validacion_detection=skip_pre_validacion_detection,
-        skip_conversation_state=skip_conversation_state
-    )
-    
-    if meta_config:
-        meta_config['python_flag_columns'] = python_flag_columns
+    # Removed deprecated python_flag_columns logic
     
     # ========== DATA LOADING ==========
     # Load conversation and lead data
@@ -211,6 +195,29 @@ async def run_summarization_step(
         # Handle column renames from DB layer
         if "cleaned_phone_number" in convos_df.columns and CLEANED_PHONE_COLUMN_NAME not in convos_df.columns:
             convos_df.rename(columns={"cleaned_phone_number": CLEANED_PHONE_COLUMN_NAME}, inplace=True)
+        
+        # ------------------------------------------------------------
+        # NORMALISE PHONE NUMBER COLUMNS (critical for join matching)
+        # ------------------------------------------------------------
+        # Ensure both DataFrames use consistent string dtype with no
+        # leading/trailing whitespace so that phone keys actually match
+        # during grouping and later lookup. Inconsistent dtypes (e.g.
+        # pandas StringArray versus plain Python str) or stray spaces
+        # were causing valid conversations to be missed, leading to the
+        # observed "No conversation data found" issue.
+
+        def _normalise_phone_series(s):
+            # Cast to str, strip, keep exactly 10 digit numbers.
+            s = s.astype(str).str.strip()
+            s = s.str.extract(r"(\d{10})")[0]  # NaN for invalid rows
+            return s
+
+        leads_df[CLEANED_PHONE_COLUMN_NAME] = _normalise_phone_series(leads_df[CLEANED_PHONE_COLUMN_NAME])
+        convos_df[CLEANED_PHONE_COLUMN_NAME] = _normalise_phone_series(convos_df[CLEANED_PHONE_COLUMN_NAME])
+
+        # Drop any rows with invalid phone after normalisation
+        leads_df.dropna(subset=[CLEANED_PHONE_COLUMN_NAME], inplace=True)
+        convos_df.dropna(subset=[CLEANED_PHONE_COLUMN_NAME], inplace=True)
         
         # Validate required columns
         if CLEANED_PHONE_COLUMN_NAME not in convos_df.columns and not convos_df.empty:
@@ -282,12 +289,14 @@ async def run_summarization_step(
             max_retries = 3
             retry_delay = 5  # seconds
             attempt = 0
+            semaphore_acquired = False  # Track if semaphore was acquired
             while attempt < max_retries:
                 attempt += 1
                 try:
                     # Try to acquire semaphore with timeout to prevent deadlocks
                     try:
                         await asyncio.wait_for(semaphore.acquire(), timeout=300)
+                        semaphore_acquired = True
                         logger.debug(f"Acquired semaphore for phone {phone} (attempt {attempt})")
                     except asyncio.TimeoutError:
                         logger.error(f"Timed out waiting for semaphore for phone {phone} (attempt {attempt})")
@@ -295,28 +304,27 @@ async def run_summarization_step(
                             logger.info(f"Retrying phone {phone} after {retry_delay}s (attempt {attempt+1}/{max_retries})")
                             await asyncio.sleep(retry_delay)
                             continue
-                        completed += 1
                         summaries[phone] = {
                             "summary": "ERROR: Timed out waiting to acquire processing slot after retries.",
                             "inferred_stall_stage": "ERROR_TIMEOUT",
                             "primary_stall_reason_code": "ERROR_SEMAPHORE_TIMEOUT",
                             "next_action_code": "ERROR_RETRY_FAILED",
                         }
-                        return
+                        break
                     try:
-                        # Remove broken prompt logging; just run summarization as normal
+                        # just run summarization as normal
                         # Check for cached results first
+                        conversation_text = "\n".join(
+                            f"{getattr(row, 'creation_time', '')[:19]} {getattr(row, 'msg_from', '')}: {getattr(row, 'message', '')}"
+                            for row in conv_df.itertuples(index=False)
+                        )
+                        digest = compute_conversation_digest(conversation_text)  # Always define digest
                         if use_cache and phone in cached_results:
-                            conversation_text = "\n".join(
-                                f"{getattr(row, 'creation_time', '')[:19]} {getattr(row, 'msg_from', '')}: {getattr(row, 'message', '')}"
-                                for row in conv_df.itertuples(index=False)
-                            )
-                            digest = compute_conversation_digest(conversation_text)
                             cached_digest = conversation_digests.get(phone)
                             if cached_digest == digest:
                                 logger.debug(f"Using cached result for phone {phone}")
                                 summaries[phone] = cached_results[phone]
-                                return
+                                break
                         # STEP 1: Run processors to generate context for LLM
                         processor_results = {}
                         if processor_runner is not None:
@@ -327,6 +335,8 @@ async def run_summarization_step(
                                     conversation_data=conv_df,
                                     initial_results={}
                                 )
+                                if completed == 0:
+                                    print(f"[DEBUG] Processor results for {phone}: {processor_results}")
                                 logger.debug(f"ProcessorRunner results for {phone}: {list(processor_results.keys())}")
                             except Exception as e:
                                 logger.error(f"Error running processors for {phone}: {e}", exc_info=True)
@@ -336,11 +346,26 @@ async def run_summarization_step(
                             conv_df.copy(),
                             temporal_flags=processor_results  # Pass processor results to LLM
                         )
+                        if completed == 0:
+                            print(f"[DEBUG] LLM result for {phone}: {llm_result}")
                         # STEP 3: Validate and fix LLM output
                         validated_result = yaml_validator.fix_yaml(
                             llm_result, 
                             temporal_flags=processor_results
                         )
+                        # --- PATCH: Split embedded YAML fields if present ---
+                        if validated_result is not None:
+                            for key, value in list(validated_result.items()):
+                                if isinstance(value, str) and '\n' in value and ':' in value:
+                                    import yaml
+                                    try:
+                                        extra = yaml.safe_load(value)
+                                        if isinstance(extra, dict):
+                                            validated_result.pop(key)
+                                            validated_result.update(extra)
+                                    except Exception:
+                                        pass
+                        # --- END PATCH ---
                         if validated_result is None:
                             logger.error(f"Summarization failed for phone {phone}")
                             summaries[phone] = {
@@ -353,7 +378,7 @@ async def run_summarization_step(
                         else:
                             combined_result = {**validated_result, **processor_results}
                             combined_result[CLEANED_PHONE_COLUMN_NAME] = phone
-                            combined_result["conversation_digest"] = digest if 'digest' in locals() else ""
+                            combined_result["conversation_digest"] = digest
                             combined_result["cache_status"] = "FRESH"
                             summaries[phone] = combined_result
                         break  # Success, exit retry loop
@@ -380,10 +405,12 @@ async def run_summarization_step(
                         }
                         break
                     finally:
-                        semaphore.release()
+                        if semaphore_acquired:
+                            semaphore.release()
+                            semaphore_acquired = False
                         logger.debug(f"Released semaphore for phone {phone}")
                 finally:
-                    completed += 1
+                    completed += 1  # Only increment once per task
                     if completed % 10 == 0 or completed == total:
                         logger.info(f"Progress: {completed}/{total} ({completed/total:.1%})")
         
@@ -410,9 +437,11 @@ async def run_summarization_step(
                 row_data["error"] = errors[phone]
             else:
                 row_data["summary"] = "No conversation data found"
-                
-            result_rows.append(row_data)
             
+            if len(result_rows) == 0:
+                print(f"[DEBUG] Final row_data for {phone}: {row_data}")
+            result_rows.append(row_data)
+        
         # Create final DataFrame
         result_df = pd.DataFrame(result_rows)
         result_df = optimize_dataframe(result_df)
@@ -447,6 +476,12 @@ async def run_summarization_step(
             result_df = result_df.drop(columns=cols_to_exclude, errors='ignore')
             logger.info(f"Applied exclude_columns filter: {cols_to_exclude}")
         
+        # Ensure all output_columns exist in result_df, even if empty
+        if output_columns:
+            for col in output_columns:
+                if col not in result_df.columns:
+                    result_df[col] = ""
+        
         # ========== OUTPUT ==========
         # Prepare output path and filename
         today_str = datetime.now().strftime('%Y%m%d')
@@ -475,7 +510,8 @@ async def run_summarization_step(
                 df=result_df,
                 output_dir=output_dir,
                 base_name=output_filename,
-                formats=export_formats
+                formats=export_formats,
+                columns=output_columns
             )
             
             if "csv" in export_paths:
@@ -504,7 +540,8 @@ async def run_summarization_step(
                 df=result_df,
                 output_dir=run_dir,
                 base_name="analysis",
-                formats=export_formats
+                formats=export_formats,
+                columns=output_columns
             )
             
             if "csv" in dated_output_paths:

@@ -26,4 +26,12 @@ repos:
         args: [--fix, --exit-non-zero-on-fix]
         files: ^(lead_recovery/|dashboard/|tests/)
       - id: ruff-format
-        files: ^(lead_recovery/|dashboard/|tests/) 
+        files: ^(lead_recovery/|dashboard/|tests/)
+
+- repo: local
+  hooks:
+    - id: validate-recipes
+      name: Validate all recipes
+      entry: python scripts/validate_all_recipes.py
+      language: system
+      types: [yaml] 

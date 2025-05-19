@@ -1,11 +1,12 @@
 recipe_name: "top_up_may"
 version: "1.0"
 description: "Recipe for analyzing lead engagement in the active Top Up May campaign, using leads.csv as input."
+recipe_schema_version: 2
 
 data_input:
   lead_source_type: csv
   csv_config:
-    csv_file: "output_run/leads.csv"
+    csv_file: "leads.csv"
   conversation_sql_file_bigquery: "bigquery.sql"
 
 llm_config:

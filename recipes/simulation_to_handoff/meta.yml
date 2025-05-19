@@ -1,6 +1,7 @@
 recipe_name: "simulation_to_handoff"
 version: "v17"
 description: "Recipe for analyzing leads that reached simulation but not handoff (Time Aware)"
+recipe_schema_version: 2
 
 data_input:
   lead_source_type: redshift
@@ -12,109 +13,31 @@ llm_config:
   prompt_file: "prompt.txt"
   expected_llm_keys:
     summary:
-      description: "LLM generated summary."
+      description: "LLM generated summary of the conversation."
       type: str
-    inferred_stall_stage:
-      description: "Stage where the lead stalled in the funnel."
-      type: str
-      enum_values: [
-        "PRE_VALIDACION_PY",
-        "POST_VALIDACION_PY",
-        "HANDOFF_INVITACION_PENDIENTE_RESPUESTA",
-        "HANDOFF_DECLINADO_POR_USUARIO",
-        "HANDOFF_PROCESO_INICIADO_POR_USUARIO",
-        "HANDOFF_COMPLETADO",
-        "HANDOFF_ESTADO_DESCONOCIDO_PY"
-      ]
     primary_stall_reason_code:
-      description: "Root cause reason for the stall."
+      description: "Root cause for the stall, as determined by the LLM."
       type: str
       enum_values: [
-        "FINANCIAMIENTO_ACTIVO",
-        "VEHICULO_ANTIGUO_KM",
-        "NO_PROPIETARIO",
-        "VIN_EXTRANJERO",
-        "ZONA_NO_CUBIERTA",
-        "ADEUDO_VEHICULAR_MULTAS",
-        "PROBLEMA_SEGUNDA_LLAVE",
-        "PROBLEMA_TERMINOS",
-        "GHOSTING",
-        "ERROR_PROCESO_INTERNO",
-        "RECHAZADO_POR_KUNA",
-        "PRODUCTO_INCORRECTO_COMPRADOR",
-        "DESINTERES_EXPLICITO",
-        "AMBIGUO",
-        "OTRO_PROCESO_DE_NEGOCIO",
-        "PROCESO_EN_CURSO",
-        "PROCESO_EN_CURSO_USUARIO_OCUPADO",
-        "NUNCA_RESPONDIO",
-        "N/A"
-      ]
-    prior_reactivation_attempt_count:
-      description: "Count of manual reactivation attempts."
-      type: int
-    reactivation_status_assessment:
-      description: "Assessment of manual reactivation phase."
-      type: str
-      enum_values: [
-        "NO_APLICA_AUN",
-        "PENDIENTE_PRIMERA_REACTIVACION",
-        "REACTIVACION_EN_CURSO_INTENTO_1_ENVIADO",
-        "REACTIVACION_EN_CURSO_INTENTO_2_ENVIADO",
-        "REACTIVACION_TARDIA_NECESITA_INTENTO_1",
-        "REACTIVACION_TARDIA_NECESITA_INTENTO_2",
-        "REACTIVACION_TARDIA_NECESITA_INTENTO_3",
-        "REACTIVACION_COMPLETA_3_INTENTOS_SIN_RESPUESTA",
-        "NO_APLICA_POR_CIERRE_O_ESPERA",
-        "NO_APLICA_FASE_RECUPERACION"
+        "NUNCA_RESPONDIO", "FINANCIAMIENTO_ACTIVO", "VEHICULO_ANTIGUO_KM", "NO_PROPIETARIO", "VIN_EXTRANJERO", "ZONA_NO_CUBIERTA", "USUARIO_SIN_AUTO", "RECHAZADO_POR_KUNA", "PRODUCTO_INCORRECTO_COMPRADOR", "OTRO_PROCESO_DE_NEGOCIO", "DESINTERES_EXPLICITO", "ADEUDO_VEHICULAR_MULTAS", "PROBLEMA_SEGUNDA_LLAVE", "PROBLEMA_TERMINOS", "ERROR_PROCESO_INTERNO", "PROCESO_EN_CURSO", "GHOSTING", "OTRO"
       ]
     transfer_context_analysis:
-      description: "Analysis of context around human transfer."
+      description: "Brief analysis of context around the human transfer, if applicable."
       type: str
     next_action_code:
-      description: "Recommended next action."
+      description: "Recommended next action for the lead."
       type: str
       enum_values: [
-        "CERRAR",
-        "ESPERAR",
-        "ESPERAR_CONTACTO_PROGRAMADO",
-        "IGNORAR",
-        "RECONTACTAR_INMEDIATO",
-        "ENVIAR_REACTIVACION",
-        "ESPERAR_FIN_REACTIVACION",
-        "ESPERAR_TEMPLATE_RECUPERACION",
-        "MANEJAR_OBJECION",
-        "LLAMAR_LEAD_NUNCA_RESPONDIO"
+        "CERRAR", "ESPERAR", "LLAMAR_LEAD", "CONTACTO_PRIORITARIO", "MANEJAR_OBJECION", "INSISTIR", "ENVIAR_PLANTILLA_RECUPERACION"
       ]
-    next_action_context:
-      description: "Context for the next action."
-      type: str
     suggested_message_es:
-      description: "Suggested message in Spanish if applicable."
-      type: str
-    conversation_digest:
-      description: "Unique hash or digest of the conversation for caching or tracking."
-      type: str
-    last_message_ts:
-      description: "Timestamp of the last message in the conversation."
+      description: "Suggested follow-up message in Spanish, if applicable."
       type: str
   context_keys_from_python: [
-    "conversation_state",
-    "pre_validacion_detected",
-    "handoff_invitation_detected",
-    "handoff_response",
-    "handoff_finalized",
-    "LAST_USER_MESSAGE_TIMESTAMP_TZ",
-    "LAST_MESSAGE_TIMESTAMP_TZ",
     "HOURS_MINUTES_SINCE_LAST_USER_MESSAGE",
     "HOURS_MINUTES_SINCE_LAST_MESSAGE",
     "NO_USER_MESSAGES_EXIST",
     "human_transfer",
-    "last_message_sender",
-    "last_user_message_text",
-    "last_kuna_message_text",
-    "recovery_template_detected",
-    "consecutive_recovery_templates_count",
     "IS_WITHIN_REACTIVATION_WINDOW",
     "IS_RECOVERY_PHASE_ELIGIBLE"
   ]
@@ -145,33 +68,21 @@ output_columns:
   - name
   - last_name
   - cleaned_phone
+  - NO_USER_MESSAGES_EXIST
   - summary
-  - inferred_stall_stage
   - primary_stall_reason_code
-  - prior_reactivation_attempt_count
-  - reactivation_status_assessment
-  - last_message_sender
-  - last_user_message_text
-  - last_kuna_message_text
-  - last_message_ts
-  - transfer_context_analysis
   - next_action_code
-  - next_action_context
   - suggested_message_es
-  - cache_status
-  - human_transfer
-  - recovery_template_detected
-  - consecutive_recovery_templates_count
-  - handoff_finalized
-  - handoff_invitation_detected
-  - handoff_response
-  - pre_validacion_detected
-  - conversation_state
   - HOURS_MINUTES_SINCE_LAST_USER_MESSAGE
   - HOURS_MINUTES_SINCE_LAST_MESSAGE
+  - human_transfer
+  - transfer_context_analysis
+  - handoff_invitation_detected
+  - handoff_response
+  - handoff_finalized
   - IS_WITHIN_REACTIVATION_WINDOW
   - IS_RECOVERY_PHASE_ELIGIBLE
-  - LAST_USER_MESSAGE_TIMESTAMP_TZ
-  - LAST_MESSAGE_TIMESTAMP_TZ
-  - NO_USER_MESSAGES_EXIST
-  - conversation_digest 
+  # Meta data at the end
+  - last_user_message_text
+  - last_kuna_message_text
+  - last_message_sender 

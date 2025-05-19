@@ -1,100 +1,46 @@
-recipe_name: "marzo_cohorts_live"
-version: "2.0"
-description: "Analyzes marzo cohorts post-recovery attempt (May 8th onwards) for stall reason, recovery outcome, and next actions, using advanced Python flags."
+recipe_name: "simulation_to_handoff"
+version: "v17"
+description: "Recipe for analyzing leads that reached simulation but not handoff (Time Aware)"
+recipe_schema_version: 2
 
 data_input:
-  lead_source_type: csv
-  csv_config:
-    csv_file: "leads.csv"
-  conversation_sql_file_bigquery: "bigquery.sql"
+  lead_source_type: redshift
+  redshift_config:
+    sql_file: "simulation_to_handoff_redshift.sql"
+  conversation_sql_file_bigquery: "simulation_to_handoff_bigquery.sql"
 
 llm_config:
   prompt_file: "prompt.txt"
   expected_llm_keys:
     summary:
-      description: "A brief summary of the lead status."
+      description: "LLM generated summary of the conversation."
       type: str
-    inferred_stall_stage:
-      description: "Stage where the lead stalled in the process."
-      type: str
-      enum_values:
-        - "PRE_VALIDACION_PY"
-        - "POST_VALIDACION_PY"
-        - "HANDOFF_INVITACION_PENDIENTE_RESPUESTA"
-        - "HANDOFF_DECLINADO_POR_USUARIO"
-        - "HANDOFF_PROCESO_INICIADO_POR_USUARIO"
-        - "HANDOFF_COMPLETADO"
-        - "HANDOFF_ESTADO_DESCONOCIDO_PY"
     primary_stall_reason_code:
-      description: "Primary reason code for the stall."
+      description: "Root cause for the stall, as determined by the LLM."
       type: str
-      enum_values:
-        - "GHOSTING_POST_RECUPERACION"
-        - "AVANCES_EN_PROCESO"
-        - "NO_INTERESADO_EXPLICITAMENTE"
-        - "SOLICITO_NO_CONTACTAR"
-        - "VEHICULO_ANTIGUO_KM"
-        - "NO_PROPIETARIO"
-        - "VIN_EXTRANJERO"
-        - "ZONA_NO_CUBIERTA"
-        - "ADEUDO_VEHICULAR"
-        - "PROBLEMA_SEGUNDA_LLAVE"
-        - "PROBLEMA_TERMINOS"
-        - "ERROR_PROCESO_INTERNO"
-        - "RECHAZADO_POR_KUNA"
-        - "PRODUCTO_INCORRECTO_COMPRADOR"
-        - "FINANCIAMIENTO_ACTIVO"
-        - "ADEUDO_VEHICULAR_MULTAS"
-        - "OTRO_PROCESO_DE_NEGOCIO"
-        - "N/A"
-        - "OTRO"
-    prior_reactivation_attempt_count:
-      description: "Count of prior reactivation attempts."
-      type: int
-    reactivation_status_assessment:
-      description: "Assessment of reactivation status."
-      type: str
-      enum_values:
-        - "NO_APLICA_AUN"
-        - "PENDIENTE_PRIMERA_REACTIVACION"
-        - "REACTIVACION_EN_CURSO_INTENTO_1_ENVIADO"
-        - "REACTIVACION_EN_CURSO_INTENTO_2_ENVIADO"
-        - "REACTIVACION_TARDIA_NECESITA_INTENTO_1"
-        - "REACTIVACION_TARDIA_NECESITA_INTENTO_2"
-        - "REACTIVACION_TARDIA_NECESITA_INTENTO_3"
-        - "REACTIVACION_COMPLETA_3_INTENTOS_SIN_RESPUESTA"
-        - "NO_APLICA_POR_CIERRE_O_ESPERA"
-        - "NO_APLICA_FASE_RECUPERACION"
+      enum_values: [
+        "NUNCA_RESPONDIO", "FINANCIAMIENTO_ACTIVO", "VEHICULO_ANTIGUO_KM", "NO_PROPIETARIO", "VIN_EXTRANJERO", "ZONA_NO_CUBIERTA", "USUARIO_SIN_AUTO", "RECHAZADO_POR_KUNA", "PRODUCTO_INCORRECTO_COMPRADOR", "OTRO_PROCESO_DE_NEGOCIO", "DESINTERES_EXPLICITO", "ADEUDO_VEHICULAR_MULTAS", "PROBLEMA_SEGUNDA_LLAVE", "PROBLEMA_TERMINOS", "ERROR_PROCESO_INTERNO", "PROCESO_EN_CURSO", "GHOSTING", "OTRO"
+      ]
     transfer_context_analysis:
-      description: "Analysis of transfer context."
+      description: "Brief analysis of context around the human transfer, if applicable."
       type: str
     next_action_code:
-      description: "Code for the next action to take."
+      description: "Recommended next action for the lead."
       type: str
-      enum_values:
-        - "CERRAR"
-        - "ESPERAR"
-        - "ESPERAR_CONTACTO_PROGRAMADO"
-        - "IGNORAR"
-        - "RECONTACTAR_INMEDIATO"
-        - "ENVIAR_REACTIVACION"
-        - "ESPERAR_FIN_REACTIVACION"
-        - "ESPERAR_TEMPLATE_RECUPERACION"
-        - "MANEJAR_OBJECION"
-        - "LLAMAR_LEAD_NUNCA_RESPONDIO"
-    next_action_context:
-      description: "Context for the next action."
-      type: str
+      enum_values: [
+        "CERRAR", "ESPERAR", "LLAMAR_LEAD", "CONTACTO_PRIORITARIO", "MANEJAR_OBJECION", "INSISTIR", "ENVIAR_PLANTILLA_RECUPERACION"
+      ]
     suggested_message_es:
-      description: "Suggested message in Spanish for next contact."
+      description: "Suggested follow-up message in Spanish, if applicable."
       type: str
-    thought_process:
-      description: "Detailed thought process of analysis."
-      type: str
-    summary_what_went_wrong:
-      description: "Summary of what went wrong with the lead."
-      type: str
-  context_keys_from_python: []
+  context_keys_from_python: [
+    "HOURS_MINUTES_SINCE_LAST_USER_MESSAGE",
+    "HOURS_MINUTES_SINCE_LAST_MESSAGE",
+    "NO_USER_MESSAGES_EXIST",
+    "human_transfer",
+    "IS_WITHIN_REACTIVATION_WINDOW",
+    "IS_RECOVERY_PHASE_ELIGIBLE"
+  ]
 
 python_processors:
   - module: "lead_recovery.processors.temporal.TemporalProcessor"
@@ -105,8 +51,6 @@ python_processors:
       max_message_length: 150
   - module: "lead_recovery.processors.handoff.HandoffProcessor"
     params: {}
-  - module: "lead_recovery.processors.human_transfer.HumanTransferProcessor"
-    params: {}
   - module: "lead_recovery.processors.template.TemplateDetectionProcessor"
     params:
       template_type: "recovery"
@@ -114,50 +58,31 @@ python_processors:
     params: {}
   - module: "lead_recovery.processors.conversation_state.ConversationStateProcessor"
     params: {}
+  - module: "lead_recovery.processors.human_transfer.HumanTransferProcessor"
+    params: {}
 
 output_columns:
+  - lead_id
+  - user_id
+  - lead_created_at
+  - name
+  - last_name
   - cleaned_phone
-  - Email
-  - Asset ID
-  - Last Bureua Score
-  - Max Loan
-  - Nombre
-  - Cohort
-  - Control Group
-  - Initial Step
-  - Initial Step Date
-  - Last Step
-  - Last Step Date
-  - Bill Date
-  - handoff_reached
+  - NO_USER_MESSAGES_EXIST
   - summary
-  - inferred_stall_stage
   - primary_stall_reason_code
-  - prior_reactivation_attempt_count
-  - reactivation_status_assessment
-  - transfer_context_analysis
   - next_action_code
-  - next_action_context
   - suggested_message_es
-  - thought_process
-  - summary_what_went_wrong
-  - conversation_state
-  - pre_validacion_detected
+  - HOURS_MINUTES_SINCE_LAST_USER_MESSAGE
+  - HOURS_MINUTES_SINCE_LAST_MESSAGE
+  - human_transfer
+  - transfer_context_analysis
   - handoff_invitation_detected
   - handoff_response
   - handoff_finalized
-  - LAST_USER_MESSAGE_TIMESTAMP_TZ
-  - LAST_MESSAGE_TIMESTAMP_TZ
-  - HOURS_MINUTES_SINCE_LAST_USER_MESSAGE
-  - HOURS_MINUTES_SINCE_LAST_MESSAGE
-  - NO_USER_MESSAGES_EXIST
-  - human_transfer
-  - last_message_sender
-  - last_user_message_text
-  - last_kuna_message_text
-  - recovery_template_detected
-  - consecutive_recovery_templates_count
   - IS_WITHIN_REACTIVATION_WINDOW
   - IS_RECOVERY_PHASE_ELIGIBLE
-
-
+  # Meta data at the end
+  - last_user_message_text
+  - last_kuna_message_text
+  - last_message_sender 

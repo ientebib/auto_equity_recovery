@@ -1,6 +1,7 @@
 recipe_name: "marzo_cohorts"
 version: "1.0"
 description: "Analyzes marzo cohorts of leads to understand why they stalled."
+recipe_schema_version: 2
 
 data_input:
   lead_source_type: csv

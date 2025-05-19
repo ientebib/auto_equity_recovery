@@ -117,11 +117,19 @@ class SummaryCache:
             conn.close()
             
     def _get_connection(self) -> sqlite3.Connection:
-        """Get a connection to the SQLite database with optimized settings."""
-        # Set busy_timeout to 30 seconds to wait for locks to be released
-        # Use WAL journal mode for better concurrency and performance
+        """Get a connection to the SQLite database with optimized settings and configurable journal mode."""
         conn = sqlite3.connect(self.db_path, timeout=30)
-        conn.execute("PRAGMA journal_mode=WAL")
+        # Use configurable journal mode (default WAL)
+        journal_mode = getattr(settings, 'SQLITE_JOURNAL_MODE', 'WAL')
+        try:
+            conn.execute(f"PRAGMA journal_mode={journal_mode}")
+        except Exception as e:
+            # Fallback to DELETE if WAL is not supported
+            try:
+                conn.execute("PRAGMA journal_mode=DELETE")
+                logger.warning(f"Falling back to journal_mode=DELETE due to error: {e}")
+            except Exception as e2:
+                logger.error(f"Failed to set journal_mode=DELETE: {e2}")
         conn.execute("PRAGMA busy_timeout=30000")  # 30 seconds in milliseconds
         conn.execute("PRAGMA synchronous=NORMAL")  # Faster, still safe
         conn.execute("PRAGMA cache_size=-10000")   # Use 10MB of memory for caching

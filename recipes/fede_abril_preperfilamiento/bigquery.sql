@@ -1,7 +1,3 @@
--- Recipe: Profiling_Incomplete  (RENAMED FILE: bigquery_profiling_incomplete.sql)
--- Conversation history fetch for leads with no profile completed.
--- ---------------------------------------------------------------------------
-
 SELECT
     RIGHT(b.user_platform_contact_id, 10) AS cleaned_phone_number,
     a.creation_time,

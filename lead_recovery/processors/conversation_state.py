@@ -6,9 +6,11 @@ import pandas as pd
 from lead_recovery.processors.utils import convert_df_to_message_list
 
 from .base import BaseProcessor
+from ._registry import register_processor
 
 logger = logging.getLogger(__name__)
 
+@register_processor
 class ConversationStateProcessor(BaseProcessor):
     """
     Processor for determining the overall state of a conversation.

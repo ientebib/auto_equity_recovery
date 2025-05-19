@@ -8,8 +8,7 @@ from pathlib import Path
 from typing import Dict, List
 
 import yaml
-
-from ..python_flags import FUNCTION_COLUMNS
+from lead_recovery.processors._registry import get_columns_for_processor
 
 logger = logging.getLogger(__name__)
 
@@ -50,21 +49,9 @@ def get_columns_from_yaml(recipe_path: Path) -> Dict[str, List[str]]:
     
     return result
 
-def get_columns_for_function(function_name: str) -> List[str]:
-    """
-    Get the columns produced by a specific function.
-    
-    Args:
-        function_name: Name of the function
-        
-    Returns:
-        List of column names produced by the function
-    """
-    # Special cases for function name mapping
-    if function_name == "temporal_flags":
-        function_name = "calculate_temporal_flags"
-    
-    return FUNCTION_COLUMNS.get(function_name, [])
+def get_columns_for_function(function_name: str) -> list:
+    """Get the columns produced by a specific processor class name using the registry."""
+    return get_columns_for_processor(function_name)
 
 def generate_column_includes(recipe_name: str, enabled_functions: List[str]) -> List[str]:
     """

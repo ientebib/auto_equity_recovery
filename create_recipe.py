@@ -1,25 +1,78 @@
 #!/usr/bin/env python
 """
-Recipe Generator Script
+Lead Recovery Recipe Generator
 
-Creates a new recipe with all required files set up correctly.
+This script helps you create new recipes for the Lead Recovery pipeline.
+- Non-technical users: Just run `python create_recipe.py` and follow the prompts.
+- Technical users: Use CLI flags for automation.
+
+See documentation/for_dummies_recipe_guide.md for a step-by-step guide.
 """
 import argparse
 import os
 from datetime import datetime
 from pathlib import Path
+from lead_recovery.processors._registry import PROCESSOR_REGISTRY, get_columns_for_processor
 
+# Mapping of processor class names to friendly descriptions
+PROCESSOR_DESCRIPTIONS = {
+    "TemporalProcessor": "Calculates time-based features",
+    "MessageMetadataProcessor": "Extracts message metadata",
+    "HandoffProcessor": "Analyzes handoff processes",
+    "TemplateDetectionProcessor": "Detects template messages",
+    "ValidationProcessor": "Detects pre-validation questions",
+    "ConversationStateProcessor": "Determines conversation state",
+    "HumanTransferProcessor": "Detects human transfer events",
+}
 
-def create_recipe(recipe_name, description, author, template_type="basic"):
+COMMON_LLM_KEYS = ["summary", "next_action_code", "lead_name", "current_stage", "primary_issue", "recommended_action", "suggested_followup_message"]
+DEFAULT_LEAD_COLUMNS = ["cleaned_phone", "lead_id", "name", "last_name"]
+
+def create_recipe(recipe_name=None, description=None, author=None, template_type="basic", processors=None, llm_keys=None, lead_columns=None):
     """
-    Creates a new recipe with all required files.
+    Interactive and non-interactive recipe creation.
+    If any argument is None, prompt the user for it.
+    """
+    # Interactive mode for non-technical users
+    if not recipe_name:
+        print("\nWelcome to the Lead Recovery Recipe Creator! 🎉\n")
+        recipe_name = input("1. What is the name of your recipe?  ").strip()
+    if not description:
+        description = input("2. Describe what this recipe does (one sentence):  ").strip()
+    if not author:
+        author = os.environ.get("USER", "Unknown")
+    # Processor selection
+    if not processors:
+        print("\n3. Which processors do you want to use?")
+        for i, proc in enumerate(PROCESSOR_REGISTRY.keys()):
+            desc = PROCESSOR_DESCRIPTIONS.get(proc, "(no description)")
+            print(f"  {i+1}. {proc} - {desc}")
+        selected = input("   Enter numbers separated by commas (e.g., 1,2,5):  ")
+        selected_indices = [int(x.strip())-1 for x in selected.split(",") if x.strip().isdigit()]
+        processors = [list(PROCESSOR_REGISTRY.keys())[i] for i in selected_indices if 0 <= i < len(PROCESSOR_REGISTRY)]
+    # LLM keys
+    if not llm_keys:
+        print("\n4. What should the LLM output? (Choose or type keys, separated by commas)")
+        print(f"   Common options: {', '.join(COMMON_LLM_KEYS)}")
+        llm_keys = [x.strip() for x in input("   LLM keys:  ").split(",") if x.strip()]
+    # Lead columns
+    if lead_columns is None:
+        yn = input("\n5. Do you want to include extra lead info columns (like cleaned_phone, lead_id, name)? (Y/N):  ").strip().lower()
+        lead_columns = DEFAULT_LEAD_COLUMNS if yn.startswith("y") else []
+    # Build python_processors and output_columns
+    python_processors = []
+    output_columns_set = set()
+    for proc in processors:
+        python_processors.append({
+            "module": f"lead_recovery.processors.{proc.lower()}.{proc}",
+            "params": {}
+        })
+        output_columns_set.update(get_columns_for_processor(proc))
+    output_columns = list(lead_columns) + llm_keys + list(output_columns_set)
+    # Remove duplicates, preserve order
+    seen = set()
+    output_columns = [x for x in output_columns if not (x in seen or seen.add(x))]
     
-    Args:
-        recipe_name: Name of the recipe (will be folder name)
-        description: Short description of the recipe's purpose
-        author: Name of the recipe creator
-        template_type: Type of template to use (basic, analyzer, etc.)
-    """
     # Validate recipe name (no spaces, special chars)
     if not recipe_name.isalnum() and not all(c.isalnum() or c == '_' for c in recipe_name):
         print(f"Error: Recipe name '{recipe_name}' contains invalid characters. Use only letters, numbers, and underscores.")
@@ -101,6 +154,7 @@ Do not include any explanations or additional text outside the YAML block.""",
 name: "{recipe_name}"
 description: "{description}"
 version: "1.0"
+recipe_schema_version: 2
 author: "{author}"
 created_date: "{date}"
 
@@ -538,6 +592,17 @@ if __name__ == "__main__":
     print(f"   prompt_file: {recipe_name}_prompt.txt")
     print("   ```")
     print("2. This is the approach used by the simulation_to_handoff recipe.")
+    
+    print("\nNOTE: All generated recipes use schema version 2. If you see a schema version error, update your meta.yml accordingly.")
+    
+    print("\nNOTE: After creating your recipe, run the validation script or CLI command to ensure compliance:")
+    print("  python scripts/validate_all_recipes.py")
+    print("  or: python -m lead_recovery.cli.main validate-recipes")
+    
+    print("\n✅ Recipe created!")
+    print(f"- meta.yml, prompt.txt, bigquery.sql, redshift.sql, README.md in recipes/{recipe_name}/")
+    print("\nNext step: Run `python scripts/validate_all_recipes.py` to check your recipe.")
+    print("Or see the FOR DUMMIES guide: documentation/for_dummies_recipe_guide.md\n")
     
     return True
 

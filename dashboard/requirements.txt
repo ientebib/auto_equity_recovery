@@ -1,5 +1,0 @@
-streamlit>=1.33.0
-pyyaml>=6.0
-pathlib>=1.0.1
-python-dotenv>=1.0.0
-watchdog>=3.0.0  # For better file watching performance 

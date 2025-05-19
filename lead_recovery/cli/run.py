@@ -301,6 +301,10 @@ def handle_redshift_stage(recipe: str, skip_redshift: bool, redshift_sql_path: P
     # Check for today's marker unless explicitly ignored
     marker_exists, marker_path = check_redshift_marker(recipe)
     
+    # If caller does NOT want to use cache, treat as ignore marker implicitly
+    if not use_cached_redshift:
+        ignore_redshift_marker = True
+
     if marker_exists and not ignore_redshift_marker:
         logger.info(f"Redshift marker found for today ({marker_path}). Using cached Redshift data.")
         # Only skip if cached data exists
@@ -500,7 +504,7 @@ def run_pipeline(
     max_workers: Optional[int] = typer.Option(None, help="Max concurrent workers for OpenAI calls"),
     output_dir: Optional[str] = typer.Option(None, help="Override base output directory"),
     recipes_dir: Optional[str] = typer.Option(None, help="Override recipes directory path (default: recipes/ in project root)"),
-    use_cached_redshift: bool = typer.Option(True, help="Use cached Redshift data if available"),
+    use_cached_redshift: bool = typer.Option(False, help="Use cached Redshift data if available (default: False – always refresh leads)"),
     use_cache: bool = typer.Option(True, "--use-cache/--no-cache", help="Use summarization cache if available."),
     ignore_redshift_marker: bool = typer.Option(False, "--ignore-redshift-marker", help="Ignore existing Redshift marker and run query even if already run today."),
     skip_processors: Optional[List[str]] = typer.Option(None, "--skip-processor", help="List of processor class names to skip"),

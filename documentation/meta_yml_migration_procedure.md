@@ -118,4 +118,6 @@ This table maps the skip flags from old recipes to the appropriate processor mod
 
 ## Guide to Processor Configuration
 
-For a complete guide to the processor system including detailed descriptions of all available processors, their parameters, and generated columns, please refer to the `documentation/python_processors_guide.md` file. 
+For a complete guide to the processor system including detailed descriptions of all available processors, their parameters, and generated columns, please refer to the `documentation/python_processors_guide.md` file.
+
+* **Note:** The old python_flags_manager.py and all flag-based logic are deprecated and removed. Migrate all recipes to use processor-level controls and output_columns. 

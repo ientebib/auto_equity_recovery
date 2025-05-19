@@ -6,8 +6,9 @@ import pandas as pd
 from lead_recovery.processors.utils import convert_df_to_message_list, strip_accents
 
 from .base import BaseProcessor
+from ._registry import register_processor
 
-
+@register_processor
 class HandoffProcessor(BaseProcessor):
     """
     Processor for analyzing handoff processes in conversations.
@@ -86,6 +87,9 @@ class HandoffProcessor(BaseProcessor):
             # If user started handoff, check if it was finalized (unless skipped)
             if result["handoff_response"] == "STARTED_HANDOFF" and not skip_handoff_finalized:
                 result["handoff_finalized"] = self._detect_handoff_finalized(conversation_messages, invitation_index)
+        # NEW LOGIC: If invitation detected but response check is skipped, set a neutral/accurate response
+        elif result["handoff_invitation_detected"] and skip_handoff_started:
+            result["handoff_response"] = "INVITATION_SENT"
         
         return result
     

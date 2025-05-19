@@ -132,6 +132,16 @@ class RecipeLoader:
                     recipe_dir, parsed_meta.llm_config.prompt_file
                 ))
             
+            # --- Enum Extraction for Validation ---
+            # Add validation_enums to meta dict for use by YamlValidator
+            meta_dict = parsed_meta.dict()
+            if 'llm_config' in meta_dict and 'expected_llm_keys' in meta_dict['llm_config']:
+                meta_dict['validation_enums'] = {
+                    key: cfg['enum_values']
+                    for key, cfg in meta_dict['llm_config']['expected_llm_keys'].items()
+                    if cfg.get('enum_values')
+                }
+
             return parsed_meta
 
         except ValidationError as e:

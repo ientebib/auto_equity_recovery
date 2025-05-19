@@ -62,7 +62,11 @@ class ConversationSummarizer:
         self.yaml_terminator_key = self.meta_config.get('yaml_terminator_key', 'suggested_message_es:')
         
         self._prompt_template_path = None # Store the path for potential later use
-        self._recipe_name = Path(prompt_template_path).parent.name if prompt_template_path else None # Store recipe name
+        # Only now compute recipe name if prompt_template_path is not None
+        if prompt_template_path:
+            self._recipe_name = Path(prompt_template_path).parent.name
+        else:
+            self._recipe_name = None
         
         # Initialize cache if enabled
         self.use_cache = use_cache

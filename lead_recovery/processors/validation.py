@@ -5,8 +5,10 @@ import pandas as pd
 from lead_recovery.processors.utils import convert_df_to_message_list, strip_accents
 
 from .base import BaseProcessor
+from ._registry import register_processor
 
 
+@register_processor
 class ValidationProcessor(BaseProcessor):
     """
     Processor for detecting pre-validation questions in conversations.

@@ -72,6 +72,7 @@ class PythonProcessorConfig(BaseModel):
 
 class RecipeMeta(BaseModel):
     """Root model for the recipe meta.yml configuration."""
+    recipe_schema_version: int = Field(..., ge=2, le=2, description="Schema version for this recipe meta.yml. Must be 2.")
     recipe_name: str = Field(..., min_length=1, description="Unique name for the recipe. Should match directory name.")
     description: Optional[str] = None
     version: str = "1.0"

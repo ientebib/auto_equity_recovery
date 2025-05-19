@@ -68,6 +68,7 @@ class Settings(BaseSettings):
     BQ_BATCH_SIZE: int = 500
     BQ_MAX_CONCURRENT_QUERIES: int = 10
     OUTPUT_DIR: Path = Path("output_run")
+    SQLITE_JOURNAL_MODE: str = Field(default="WAL", description="SQLite journal mode for cache (WAL or DELETE)")
 
     class Config:
         env_file = ".env"

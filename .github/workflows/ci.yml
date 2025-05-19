@@ -18,7 +18,3 @@ jobs:
         run: ruff check . --output-format=github
       - name: Test with pytest
         run: pytest -q
-      - name: Clean Python cache
-        run: |
-          find . -name '__pycache__' -exec rm -rf {} +
-          find . -name '*.pyc' -delete

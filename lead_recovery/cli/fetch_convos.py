@@ -58,17 +58,17 @@ def fetch_convos(
         
     logger.info(f"Using SQL file: {sql_file}")
 
-    # Direct reading of CSV to extract phone numbers, bypassing pandas completely
-    phones = []
+    # Use pandas to robustly read leads.csv and extract phone numbers
     try:
-        with open(leads_path, 'r', newline='') as csvfile:
-            reader = csv.DictReader(csvfile)
-            for row in reader:
-                if 'cleaned_phone' in row and row['cleaned_phone']:
-                    phones.append(row['cleaned_phone'])
-        phones = list(set(phones))  # Get unique phone numbers
+        leads_df = pd.read_csv(leads_path, dtype=str)
+        if 'cleaned_phone' in leads_df.columns:
+            phones = leads_df['cleaned_phone'].dropna().astype(str).str.strip()
+            phones = [p for p in phones if p]
+            phones = list(set(phones))
+        else:
+            phones = []
     except Exception as e:
-        logger.error(f"Error reading leads.csv: {e}", exc_info=True)
+        logger.error(f"Error reading leads.csv with pandas: {e}", exc_info=True)
         raise typer.Exit(1)
 
     if not phones:

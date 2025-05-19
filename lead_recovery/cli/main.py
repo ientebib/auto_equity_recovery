@@ -4,8 +4,11 @@ import sys
 from typing import List, Optional
 
 import typer
+import subprocess
 
-from . import app, fetch_convos, fetch_leads, report, run, summarize, update_recipe_columns
+from . import app, fetch_convos, fetch_leads, report, run, summarize
+from . import recipes_migrate  # Migration helper CLI
+from . import update_output_columns  # Output columns updater CLI
 
 # Configure main CLI application
 logger = logging.getLogger(__name__)
@@ -16,7 +19,8 @@ app.add_typer(fetch_convos.app, name="fetch-convos")
 app.add_typer(summarize.app, name="summarize")
 app.add_typer(report.app, name="report")
 app.add_typer(run.app, name="run")
-app.add_typer(update_recipe_columns.app, name="update-recipe-columns")
+app.add_typer(recipes_migrate.app, name="recipes-migrate")  # Migration helper CLI
+app.add_typer(update_output_columns.app, name="update-output-columns")  # Output columns updater CLI
 
 @app.command()
 def run(
@@ -59,6 +63,13 @@ def run(
         exclude_columns=exclude_columns,
         limit=limit
     )
+
+@app.command()
+def validate_recipes():
+    """Validate all recipes for schema and output column compliance."""
+    result = subprocess.run(["python", "scripts/validate_all_recipes.py"])
+    if result.returncode != 0:
+        raise typer.Exit(result.returncode)
 
 def main() -> None:  # noqa: D401
     """CLI entrypoint."""

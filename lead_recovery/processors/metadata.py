@@ -3,8 +3,10 @@ from typing import Any, Dict, Optional
 import pandas as pd
 
 from .base import BaseProcessor
+from ._registry import register_processor
 
 
+@register_processor
 class MessageMetadataProcessor(BaseProcessor):
     """
     Processor for extracting metadata from conversation messages.

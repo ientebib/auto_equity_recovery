@@ -194,6 +194,7 @@ urllib3==2.4.0
     # via
     #   botocore
     #   requests
+ruamel.yaml==0.18.0
 
 # Additional dependencies for Google Sheets integration
 gspread>=5.10.0
