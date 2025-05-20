@@ -4,6 +4,12 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 
 from lead_recovery.processors.utils import convert_df_to_message_list, strip_accents
+from .patterns import (
+    HANDOFF_INVITATION_REGEX_PATTERN,
+    HANDOFF_ACCEPTANCE_PATTERNS,
+    HANDOFF_DECLINE_PATTERNS,
+    HANDOFF_COMPLETION_PHRASES
+)
 
 from .base import BaseProcessor
 from ._registry import register_processor
@@ -106,15 +112,7 @@ class HandoffProcessor(BaseProcessor):
             True if handoff invitation was detected, False otherwise
         """
         # Regex to detect handoff invitation
-        handoff_invitation_pattern = re.compile(
-            r"Estas a un paso de la aprobacion de tu prestamo personal|"
-            r"un paso de la aprobacion|"
-            r"Esta oferta es por tiempo limitado|"
-            r"Completa el proceso ahora|"
-            r"asegura tu prestamo en minutos|"
-            r"No pierdas la oportunidad", 
-            re.IGNORECASE
-        )
+        handoff_invitation_pattern = re.compile(HANDOFF_INVITATION_REGEX_PATTERN, re.IGNORECASE)
         
         for i, msg in enumerate(conversation_messages):
             # Only check bot messages
@@ -161,33 +159,13 @@ class HandoffProcessor(BaseProcessor):
         first_response = user_responses[0]
         response_text = strip_accents(first_response.get('message', '').lower())
         
-        # Patterns for accepting handoff
-        acceptance_patterns = [
-            r"si(,)?\s+(quisiera|quiero)",
-            r"acepto.*oferta",
-            r"(quisiera|quiero|gustaria).*mas\s+informacion",
-            r"me\s+interesa",
-            r"(quisiera|quiero|gustaria).*saber\s+mas",
-            r"continuar.*proceso",
-            r"^si$",
-            r"^si\s+por\s+favor$"
-        ]
-        
-        # Patterns for declining handoff
-        decline_patterns = [
-            r"no(,)?\s+(quiero|quisiera|me\s+interesa)",
-            r"no\s+gracias",
-            r"rechaz[oa]",
-            r"^no$"
-        ]
-        
         # Check for acceptance patterns
-        for pattern in acceptance_patterns:
+        for pattern in HANDOFF_ACCEPTANCE_PATTERNS:
             if re.search(pattern, response_text):
                 return "STARTED_HANDOFF"
                 
         # Check for decline patterns
-        for pattern in decline_patterns:
+        for pattern in HANDOFF_DECLINE_PATTERNS:
             if re.search(pattern, response_text):
                 return "DECLINED_HANDOFF"
                 
@@ -206,15 +184,6 @@ class HandoffProcessor(BaseProcessor):
         Returns:
             True if handoff was finalized, False otherwise
         """
-        # Patterns indicating handoff completion
-        completion_phrases = [
-            r"tu\s+solicitud\s+ha\s+sido\s+enviada",
-            r"tu\s+solicitud\s+ha\s+sido\s+recibida",
-            r"tu\s+solicitud\s+ha\s+sido\s+procesada",
-            r"gracias\s+por\s+completar\s+el\s+proceso",
-            r"hemos\s+recibido\s+tu\s+solicitud"
-        ]
-        
         # Search for completion phrases in bot messages after start_index
         for i, msg in enumerate(conversation_messages):
             if i <= start_index or msg.get('msg_from') != 'bot':
@@ -222,7 +191,7 @@ class HandoffProcessor(BaseProcessor):
                 
             message_content = strip_accents(msg.get('message', '').lower())
             
-            for pattern in completion_phrases:
+            for pattern in HANDOFF_COMPLETION_PHRASES:
                 if re.search(pattern, message_content):
                     return True
         

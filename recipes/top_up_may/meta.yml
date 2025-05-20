@@ -36,7 +36,10 @@ llm_config:
     transfer_context_analysis:
       description: "Analysis of transfer context."
       type: str
-  context_keys_from_python: []
+  context_keys_from_python:
+    - "last_message_sender"
+    - "last_user_message_text"
+    - "last_kuna_message_text"
 
 python_processors:
   - module: "lead_recovery.processors.metadata.MessageMetadataProcessor"

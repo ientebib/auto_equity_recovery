@@ -4,6 +4,7 @@ from typing import Any, Dict, Optional
 import pandas as pd
 
 from lead_recovery.processors.utils import convert_df_to_message_list, strip_accents
+from .patterns import HUMAN_TRANSFER_PATTERNS
 
 from .base import BaseProcessor
 from ._registry import register_processor
@@ -65,16 +66,9 @@ class HumanTransferProcessor(BaseProcessor):
         if not conversation_messages:
             return result
         
-        # Phrases that indicate human transfer
-        human_transfer_patterns = [
-            re.compile(r"transferirte con un asesor humano", re.IGNORECASE),
-            re.compile(r"conectarte con un agente humano", re.IGNORECASE),
-            re.compile(r"hablar con un asesor", re.IGNORECASE),
-            re.compile(r"comunicarte con un asesor", re.IGNORECASE),
-            re.compile(r"transferir con un ejecutivo", re.IGNORECASE),
-            re.compile(r"un momento, estoy teniendo problemas", re.IGNORECASE),
-            re.compile(r"un supervisor te asistirá", re.IGNORECASE),
-            re.compile(r"transferirte con una persona", re.IGNORECASE)
+        # Compile patterns from the imported list
+        compiled_transfer_patterns = [
+            re.compile(pattern, re.IGNORECASE) for pattern in HUMAN_TRANSFER_PATTERNS
         ]
         
         # Check all bot messages
@@ -83,7 +77,7 @@ class HumanTransferProcessor(BaseProcessor):
                 message_content = msg.get('message', '')
                 stripped_message_content = strip_accents(message_content)
                 
-                for pattern in human_transfer_patterns:
+                for pattern in compiled_transfer_patterns:
                     if pattern.search(stripped_message_content):
                         result["human_transfer"] = True
                         return result

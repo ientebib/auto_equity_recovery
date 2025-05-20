@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 
 from lead_recovery.processors.utils import convert_df_to_message_list
+from .patterns import RECOVERY_TEMPLATE_PHRASES
 
 from .base import BaseProcessor
 from ._registry import register_processor
@@ -91,18 +92,9 @@ class TemplateDetectionProcessor(BaseProcessor):
         Returns:
             True if the message is a recovery template, False otherwise
         """
-        # Recovery template key phrases
-        recovery_phrases = [
-            "préstamo por tu auto",
-            "oferta pre aprobada",
-            "aprovecha tu oferta",
-            "espera de que nos proporciones tus documentos",
-            "template:"
-        ]
-        
         # Check for any of the recovery phrases
         message_text_lower = message_text.lower()
-        for phrase in recovery_phrases:
+        for phrase in RECOVERY_TEMPLATE_PHRASES:
             if phrase in message_text_lower:
                 return True
         

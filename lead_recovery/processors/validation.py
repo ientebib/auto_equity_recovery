@@ -3,6 +3,7 @@ from typing import Any, Dict, Optional
 import pandas as pd
 
 from lead_recovery.processors.utils import convert_df_to_message_list, strip_accents
+from .patterns import PRE_VALIDACION_PHRASES
 
 from .base import BaseProcessor
 from ._registry import register_processor
@@ -87,14 +88,8 @@ class ValidationProcessor(BaseProcessor):
         # Normalize message text - removing accents and whitespace differences
         message_text = strip_accents(message_text.lower())
         
-        # Specific pre-validation phrases to detect
-        pre_validacion_phrases = [
-            "antes de continuar, necesito confirmar tres detalles importantes sobre tu auto",
-            "necesito confirmar algunos detalles sobre tu auto y tu elegibilidad para el credito"
-        ]
-        
         # Check for phrases
-        for phrase in pre_validacion_phrases:
+        for phrase in PRE_VALIDACION_PHRASES:
             if phrase in message_text:
                 return True
         
