@@ -96,20 +96,6 @@ def _attempt_fix_colons_in_values(text: str) -> str:
         return text
 
 
-def _attempt_fix_yaml_format(text: str) -> str:
-    """Attempt to fix common YAML formatting issues."""
-    # This function is not provided in the original file or the code block
-    # It's assumed to exist as it's called in clean_response_text
-    return text
-
-
-def _cleanup_markdown(text: str) -> str:
-    """Clean up common markdown artifacts."""
-    # This function is not provided in the original file or the code block
-    # It's assumed to exist as it's called in clean_response_text
-    return text
-
-
 def clean_response_text(raw_text: str, yaml_terminator_key: str = "suggested_message_es:") -> str:  # noqa: D401
     """Run all cleaning passes on the raw OpenAI response text."""
     cleaned = _strip_markdown_fences(raw_text)
