@@ -245,7 +245,7 @@ class ConversationSummarizer:
                 except (AttributeError, KeyError) as e:
                     logger.warning(f"Could not extract token usage from response: {e}")
             
-            time.time() - start_time
+            logger.debug("OpenAI request completed in %.2fs", time.time() - start_time)
             
             if not content:
                 logger.error("OpenAI response was empty despite status 'completed'")
