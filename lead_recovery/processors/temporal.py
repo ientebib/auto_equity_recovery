@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 from typing import Any, Dict, Optional
 
@@ -7,10 +8,18 @@ import pytz
 from .base import BaseProcessor
 from ._registry import register_processor
 
+logger = logging.getLogger(__name__)
+
 
 @register_processor
 class TemporalProcessor(BaseProcessor):
     """
+    IMPORTANT ASSUMPTION: If 'creation_time' timestamps in the input `conversation_data`
+    are naive (i.e., do not have timezone information), this processor assumes they are
+    in UTC. If they are in a different timezone, calculations like 'time since last
+    message' will be incorrect. Ensure upstream data provides timezone-aware timestamps
+    or that naive timestamps are consistently UTC.
+    
     Processor for calculating temporal flags and deltas from conversation history.
     
     Analyzes timestamps in conversation data to calculate time differences,
@@ -136,6 +145,12 @@ class TemporalProcessor(BaseProcessor):
             
             return result
             
-        except Exception:
+        except Exception as e:
+            # Log the exception with stack trace
+            logger.error(
+                f"TemporalProcessor failed. Error: {e}. "
+                "Lead ID/data not directly available in this context. Returning default results.",
+                exc_info=True
+            )
             # Return default values in case of error
             return result 

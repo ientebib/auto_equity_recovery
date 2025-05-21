@@ -1,4 +1,5 @@
 import re
+import logging
 from typing import Any, Dict, Optional
 
 import pandas as pd
@@ -7,6 +8,8 @@ from lead_recovery.processors.utils import convert_df_to_message_list, strip_acc
 
 from .base import BaseProcessor
 from ._registry import register_processor
+
+logger = logging.getLogger(__name__)
 
 
 @register_processor
@@ -65,6 +68,7 @@ class HumanTransferProcessor(BaseProcessor):
         if not conversation_messages:
             return result
         
+        # CRITICAL: These phrases/patterns are key to detection accuracy. Review and update periodically based on bot script changes and observed user interactions.
         # Phrases that indicate human transfer
         human_transfer_patterns = [
             re.compile(r"transferirte con un asesor humano", re.IGNORECASE),
@@ -86,6 +90,8 @@ class HumanTransferProcessor(BaseProcessor):
                 for pattern in human_transfer_patterns:
                     if pattern.search(stripped_message_content):
                         result["human_transfer"] = True
+                        logger.debug(f"HumanTransferProcessor results: Human transfer detected: {result['human_transfer']}")
                         return result
         
+        logger.debug(f"HumanTransferProcessor results: Human transfer detected: {result['human_transfer']} (No transfer phrases found)")
         return result 

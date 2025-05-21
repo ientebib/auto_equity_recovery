@@ -1,3 +1,4 @@
+import logging
 from typing import Any, Dict, Optional
 
 import pandas as pd
@@ -6,6 +7,8 @@ from lead_recovery.processors.utils import convert_df_to_message_list, strip_acc
 
 from .base import BaseProcessor
 from ._registry import register_processor
+
+logger = logging.getLogger(__name__)
 
 
 @register_processor
@@ -72,6 +75,7 @@ class ValidationProcessor(BaseProcessor):
                     result["pre_validacion_detected"] = True
                     break
         
+        logger.debug(f"ValidationProcessor results: Pre-validation detected: {result['pre_validacion_detected']}")
         return result
     
     def _detect_pre_validacion(self, message_text: str) -> bool:
@@ -85,8 +89,9 @@ class ValidationProcessor(BaseProcessor):
             True if pre-validation message is detected, False otherwise
         """
         # Normalize message text - removing accents and whitespace differences
-        message_text = strip_accents(message_text.lower())
+        message_text_norm = strip_accents(message_text.lower())
         
+        # CRITICAL: These phrases are key to detection accuracy. Review and update periodically based on bot script changes.
         # Specific pre-validation phrases to detect
         pre_validacion_phrases = [
             "antes de continuar, necesito confirmar tres detalles importantes sobre tu auto",
@@ -95,7 +100,9 @@ class ValidationProcessor(BaseProcessor):
         
         # Check for phrases
         for phrase in pre_validacion_phrases:
-            if phrase in message_text:
+            if phrase in message_text_norm: # Use normalized text for check
+                logger.debug(f"Pre-validation phrase found: '{phrase}'")
                 return True
         
+        logger.debug(f"No pre-validation phrases found in message: '{message_text[:100]}...'") # Log a snippet
         return False 

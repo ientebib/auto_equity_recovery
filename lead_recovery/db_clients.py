@@ -76,48 +76,30 @@ class RedshiftClient:
             raise DatabaseConnectionError(f"Redshift connection failed: {e}") from e
 
     # ------------------------------------------------------------------ #
-    def query(self, sql: str, params: Dict[str, Any] | None = None) -> pd.DataFrame:
+    def query(self, sql: str, params: List[Any] | Tuple[Any, ...] | None = None) -> pd.DataFrame:
         """Execute *sql* with optional *params* and return a DataFrame.
         
         Args:
-            sql: SQL query to execute. Use %s for parameter placeholders (NOT string format!)
-            params: Dictionary of parameter values
+            sql: SQL query to execute. Use %s for parameter placeholders.
+            params: List or tuple of parameter values for positional %s placeholders.
             
         Returns:
             pandas DataFrame with query results
         """
         try:
-            # Redact sensitive data for logging
-            redacted_params = {k: '[REDACTED]' if k.lower() in ('phone', 'email', 'password') else v 
-                             for k, v in (params or {}).items()}
+            # Log params as is for now, or use a generic redaction for lists if preferred.
+            # For example: params_to_log = "[PARAMS_LIST_REDACTED]" if params else "None"
+            params_to_log = params if params is not None else "None"
             logger.debug("Executing Redshift query: %s with params: %s", 
-                        _redact_pii(sql), redacted_params)
+                        _redact_pii(sql), params_to_log)
             
             start_time = time.time()
             conn = self.connect()
             
             with conn.cursor() as cur:
-                # Use proper parameterized queries instead of string formatting
+                # Use proper parameterized queries
                 if params:
-                    # Convert dict params to proper format expected by redshift_connector
-                    # redshift_connector expects a tuple of values, not a dict
-                    param_values = []
-                    
-                    # Extract parameter placeholders from SQL
-                    placeholders = re.findall(r'%\((.*?)\)s', sql)
-                    
-                    # For each placeholder, add the value to param_values
-                    for name in placeholders:
-                        if name in params:
-                            param_values.append(params[name])
-                        else:
-                            raise DatabaseQueryError(f"Parameter '{name}' referenced in SQL but not provided in params dict")
-                    
-                    # Replace named parameters with positional ones
-                    sql = re.sub(r'%\((.*?)\)s', '%s', sql)
-                    
-                    # Execute with positional parameters
-                    cur.execute(sql, param_values)
+                    cur.execute(sql, params)
                 else:
                     cur.execute(sql)
                 
@@ -145,12 +127,12 @@ class RedshiftClient:
             logger.exception("Redshift query failed")
             raise DatabaseQueryError(f"Redshift query failed: {e}") from e
             
-    def query_from_file(self, file_path: Path | str, params: Dict[str, Any] | None = None) -> pd.DataFrame:
+    def query_from_file(self, file_path: Path | str, params: List[Any] | Tuple[Any, ...] | None = None) -> pd.DataFrame:
         """Execute a SQL query from a file with optional parameters and return the results as a DataFrame.
         
         Args:
             file_path: Path to the SQL file
-            params: Optional dictionary of parameters for the query
+            params: Optional list or tuple of parameters for the query.
             
         Returns:
             pandas DataFrame with query results

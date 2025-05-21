@@ -1,3 +1,4 @@
+import logging
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
@@ -6,6 +7,8 @@ from lead_recovery.processors.utils import convert_df_to_message_list
 
 from .base import BaseProcessor
 from ._registry import register_processor
+
+logger = logging.getLogger(__name__)
 
 
 @register_processor
@@ -79,6 +82,10 @@ class TemplateDetectionProcessor(BaseProcessor):
             if not skip_consecutive_count:
                 result["consecutive_recovery_templates_count"] = self._count_consecutive_recovery_templates(conversation_messages)
         
+        logger.debug(
+            f"TemplateDetectionProcessor results: Recovery template detected: {result['recovery_template_detected']}, "
+            f"Consecutive count: {result['consecutive_recovery_templates_count']}"
+        )
         return result
     
     def _detect_recovery_template(self, message_text: str) -> bool:
@@ -91,6 +98,7 @@ class TemplateDetectionProcessor(BaseProcessor):
         Returns:
             True if the message is a recovery template, False otherwise
         """
+        # CRITICAL: These phrases are key to detection accuracy. Review and update periodically based on bot script changes.
         # Recovery template key phrases
         recovery_phrases = [
             "préstamo por tu auto",
@@ -104,8 +112,10 @@ class TemplateDetectionProcessor(BaseProcessor):
         message_text_lower = message_text.lower()
         for phrase in recovery_phrases:
             if phrase in message_text_lower:
+                logger.debug(f"Recovery template phrase found: '{phrase}'")
                 return True
         
+        logger.debug(f"No recovery template phrases found in message: '{message_text[:100]}...'") # Log a snippet
         return False
     
     def _count_consecutive_recovery_templates(self, conversation_messages: List[Dict[str, Any]]) -> int:

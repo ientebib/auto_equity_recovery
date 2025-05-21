@@ -1,4 +1,5 @@
 import re
+import logging
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
@@ -7,6 +8,8 @@ from lead_recovery.processors.utils import convert_df_to_message_list, strip_acc
 
 from .base import BaseProcessor
 from ._registry import register_processor
+
+logger = logging.getLogger(__name__)
 
 @register_processor
 class HandoffProcessor(BaseProcessor):
@@ -90,7 +93,11 @@ class HandoffProcessor(BaseProcessor):
         # NEW LOGIC: If invitation detected but response check is skipped, set a neutral/accurate response
         elif result["handoff_invitation_detected"] and skip_handoff_started:
             result["handoff_response"] = "INVITATION_SENT"
-        
+
+        logger.debug(
+            f"HandoffProcessor results: Invitation detected: {result['handoff_invitation_detected']}, "
+            f"Response: {result['handoff_response']}, Finalized: {result['handoff_finalized']}"
+        )
         return result
     
     def _detect_handoff_invitation(self, conversation_messages: List[Dict[str, Any]], 
@@ -105,6 +112,7 @@ class HandoffProcessor(BaseProcessor):
         Returns:
             True if handoff invitation was detected, False otherwise
         """
+        # CRITICAL: These phrases/patterns are key to detection accuracy. Review and update periodically based on bot script changes and observed user interactions.
         # Regex to detect handoff invitation
         handoff_invitation_pattern = re.compile(
             r"Estas a un paso de la aprobacion de tu prestamo personal|"
@@ -123,8 +131,10 @@ class HandoffProcessor(BaseProcessor):
                 
                 # Check for handoff invitation
                 if handoff_invitation_pattern.search(strip_accents(message_content)):
+                    logger.debug("Handoff invitation phrase found.")
                     return True
         
+        logger.debug("No handoff invitation phrases found in bot messages.")
         return False
     
     def _detect_handoff_started(self, conversation_messages: List[Dict[str, Any]], 
@@ -145,6 +155,7 @@ class HandoffProcessor(BaseProcessor):
         """
         # Return NO_RESPONSE if no messages after invitation
         if handoff_invitation_index == -1 or handoff_invitation_index >= len(conversation_messages) - 1:
+            logger.debug("No messages found after handoff invitation index or invalid index.")
             return "NO_RESPONSE"
         
         # Get user messages after invitation
@@ -155,12 +166,14 @@ class HandoffProcessor(BaseProcessor):
         
         # No user response yet
         if not user_responses:
+            logger.debug("No user responses found after handoff invitation.")
             return "NO_RESPONSE"
             
         # Analyze first user response
         first_response = user_responses[0]
         response_text = strip_accents(first_response.get('message', '').lower())
         
+        # CRITICAL: These phrases/patterns are key to detection accuracy. Review and update periodically based on bot script changes and observed user interactions.
         # Patterns for accepting handoff
         acceptance_patterns = [
             r"si(,)?\s+(quisiera|quiero)",
@@ -173,6 +186,7 @@ class HandoffProcessor(BaseProcessor):
             r"^si\s+por\s+favor$"
         ]
         
+        # CRITICAL: These phrases/patterns are key to detection accuracy. Review and update periodically based on bot script changes and observed user interactions.
         # Patterns for declining handoff
         decline_patterns = [
             r"no(,)?\s+(quiero|quisiera|me\s+interesa)",
@@ -184,14 +198,17 @@ class HandoffProcessor(BaseProcessor):
         # Check for acceptance patterns
         for pattern in acceptance_patterns:
             if re.search(pattern, response_text):
+                logger.debug(f"Handoff acceptance pattern matched: {pattern}")
                 return "STARTED_HANDOFF"
                 
         # Check for decline patterns
         for pattern in decline_patterns:
             if re.search(pattern, response_text):
+                logger.debug(f"Handoff decline pattern matched: {pattern}")
                 return "DECLINED_HANDOFF"
                 
         # If neither clearly accepted nor declined, consider it unclear
+        logger.debug("User response to handoff invitation is unclear.")
         return "UNCLEAR_RESPONSE"
     
     def _detect_handoff_finalized(self, conversation_messages: List[Dict[str, Any]], 
@@ -206,6 +223,7 @@ class HandoffProcessor(BaseProcessor):
         Returns:
             True if handoff was finalized, False otherwise
         """
+        # CRITICAL: These phrases/patterns are key to detection accuracy. Review and update periodically based on bot script changes and observed user interactions.
         # Patterns indicating handoff completion
         completion_phrases = [
             r"tu\s+solicitud\s+ha\s+sido\s+enviada",
@@ -224,6 +242,8 @@ class HandoffProcessor(BaseProcessor):
             
             for pattern in completion_phrases:
                 if re.search(pattern, message_content):
+                    logger.debug(f"Handoff finalization phrase found: {pattern}")
                     return True
         
+        logger.debug("No handoff finalization phrases found in bot messages after start index.")
         return False 
