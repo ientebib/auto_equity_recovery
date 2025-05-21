@@ -6,9 +6,15 @@ from lead_recovery.summarizer_helpers import clean_response_text, parse_yaml_dic
 @pytest.mark.parametrize(
     "raw, expected",
     [
-        ("```yaml\nkey: value\n```", "key: value"),
-        ("```\nkey: value\n```", "key: value"),
-        ("key: value", "key: value"),
+        (
+            "```yaml\nkey: value\n```",
+            "key: value\ntransfer_context_analysis: \"N/A\"",
+        ),
+        (
+            "```\nkey: value\n```",
+            "key: value\ntransfer_context_analysis: \"N/A\"",
+        ),
+        ("key: value", "key: value\ntransfer_context_analysis: \"N/A\""),
     ],
 )
 def test_clean_response_text_strips_fences(raw: str, expected: str):
@@ -20,7 +26,7 @@ def test_clean_response_text_fix_quotes():
     cleaned = clean_response_text(raw)
     # Top-level quotes should be switched to single quotes
     assert cleaned.startswith("reason: '")
-    assert cleaned.endswith("yesterday'")
+    assert cleaned.endswith("yesterday'\ntransfer_context_analysis: \"N/A\"")
 
 
 def test_parse_yaml_dict_success():
