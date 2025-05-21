@@ -13,7 +13,10 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from lead_recovery.processors._registry import PROCESSOR_REGISTRY, get_columns_for_processor
+from lead_recovery.processors._registry import (
+    PROCESSOR_REGISTRY,
+    get_columns_for_processor,
+)
 
 # Mapping of processor class names to friendly descriptions
 PROCESSOR_DESCRIPTIONS = {
@@ -26,10 +29,27 @@ PROCESSOR_DESCRIPTIONS = {
     "HumanTransferProcessor": "Detects human transfer events",
 }
 
-COMMON_LLM_KEYS = ["summary", "next_action_code", "lead_name", "current_stage", "primary_issue", "recommended_action", "suggested_followup_message"]
+COMMON_LLM_KEYS = [
+    "summary",
+    "next_action_code",
+    "lead_name",
+    "current_stage",
+    "primary_issue",
+    "recommended_action",
+    "suggested_followup_message",
+]
 DEFAULT_LEAD_COLUMNS = ["cleaned_phone", "lead_id", "name", "last_name"]
 
-def create_recipe(recipe_name=None, description=None, author=None, template_type="basic", processors=None, llm_keys=None, lead_columns=None):
+
+def create_recipe(
+    recipe_name=None,
+    description=None,
+    author=None,
+    template_type="basic",
+    processors=None,
+    llm_keys=None,
+    lead_columns=None,
+):
     """
     Interactive and non-interactive recipe creation.
     If any argument is None, prompt the user for it.
@@ -39,7 +59,9 @@ def create_recipe(recipe_name=None, description=None, author=None, template_type
         print("\nWelcome to the Lead Recovery Recipe Creator! 🎉\n")
         recipe_name = input("1. What is the name of your recipe?  ").strip()
     if not description:
-        description = input("2. Describe what this recipe does (one sentence):  ").strip()
+        description = input(
+            "2. Describe what this recipe does (one sentence):  "
+        ).strip()
     if not author:
         author = os.environ.get("USER", "Unknown")
     # Processor selection
@@ -49,42 +71,59 @@ def create_recipe(recipe_name=None, description=None, author=None, template_type
             desc = PROCESSOR_DESCRIPTIONS.get(proc, "(no description)")
             print(f"  {i+1}. {proc} - {desc}")
         selected = input("   Enter numbers separated by commas (e.g., 1,2,5):  ")
-        selected_indices = [int(x.strip())-1 for x in selected.split(",") if x.strip().isdigit()]
-        processors = [list(PROCESSOR_REGISTRY.keys())[i] for i in selected_indices if 0 <= i < len(PROCESSOR_REGISTRY)]
+        selected_indices = [
+            int(x.strip()) - 1 for x in selected.split(",") if x.strip().isdigit()
+        ]
+        processors = [
+            list(PROCESSOR_REGISTRY.keys())[i]
+            for i in selected_indices
+            if 0 <= i < len(PROCESSOR_REGISTRY)
+        ]
     # LLM keys
     if not llm_keys:
-        print("\n4. What should the LLM output? (Choose or type keys, separated by commas)")
+        print(
+            "\n4. What should the LLM output? (Choose or type keys, separated by commas)"
+        )
         print(f"   Common options: {', '.join(COMMON_LLM_KEYS)}")
         llm_keys = [x.strip() for x in input("   LLM keys:  ").split(",") if x.strip()]
     # Lead columns
     if lead_columns is None:
-        yn = input("\n5. Do you want to include extra lead info columns (like cleaned_phone, lead_id, name)? (Y/N):  ").strip().lower()
+        yn = (
+            input(
+                "\n5. Do you want to include extra lead info columns (like cleaned_phone, lead_id, name)? (Y/N):  "
+            )
+            .strip()
+            .lower()
+        )
         lead_columns = DEFAULT_LEAD_COLUMNS if yn.startswith("y") else []
     # Build python_processors and output_columns
     python_processors = []
     output_columns_set = set()
     for proc in processors:
-        python_processors.append({
-            "module": f"lead_recovery.processors.{proc.lower()}.{proc}",
-            "params": {}
-        })
+        python_processors.append(
+            {"module": f"lead_recovery.processors.{proc.lower()}.{proc}", "params": {}}
+        )
         output_columns_set.update(get_columns_for_processor(proc))
     output_columns = list(lead_columns) + llm_keys + list(output_columns_set)
     # Remove duplicates, preserve order
     seen = set()
     output_columns = [x for x in output_columns if not (x in seen or seen.add(x))]
-    
+
     # Validate recipe name (no spaces, special chars)
-    if not recipe_name.isalnum() and not all(c.isalnum() or c == '_' for c in recipe_name):
-        print(f"Error: Recipe name '{recipe_name}' contains invalid characters. Use only letters, numbers, and underscores.")
+    if not recipe_name.isalnum() and not all(
+        c.isalnum() or c == "_" for c in recipe_name
+    ):
+        print(
+            f"Error: Recipe name '{recipe_name}' contains invalid characters. Use only letters, numbers, and underscores."
+        )
         return False
-    
+
     # Check if recipe already exists
     recipe_dir = Path("recipes") / recipe_name
     if recipe_dir.exists():
         print(f"Error: Recipe '{recipe_name}' already exists at {recipe_dir}")
         return False
-    
+
     # Create recipe directory
     try:
         recipe_dir.mkdir(parents=True, exist_ok=False)
@@ -92,7 +131,7 @@ def create_recipe(recipe_name=None, description=None, author=None, template_type
     except Exception as e:
         print(f"Failed to create recipe directory: {e}")
         return False
-    
+
     # Define file templates
     templates = {
         "bigquery.sql": """-- recipes/{recipe_name}/bigquery.sql
@@ -111,7 +150,6 @@ INNER JOIN `botmaker-bigdata.ext_metric_kavakcapital.session_metrics` AS b
 WHERE RIGHT(b.user_platform_contact_id, 10) IN UNNEST(@target_phone_numbers_list)
   AND a.creation_time >= TIMESTAMP('2025-01-01 00:00:00')  -- Adjust date as needed
 ORDER BY cleaned_phone_number, a.creation_time ASC;""",
-        
         "redshift.sql": """-- recipes/{recipe_name}/redshift.sql
 -- Fetches leads to analyze from Redshift.
 -- MUST include a cleaned_phone column.
@@ -127,7 +165,6 @@ FROM your_leads_table
 WHERE your_condition = 'your_criteria'
   AND created_at >= '2025-01-01'  -- Adjust date as needed
 LIMIT 1000;  -- Adjust limit as needed""",
-        
         "prompt.txt": """You are analyzing conversations between customers and the Kuna Capital support team on WhatsApp. 
 Your task is to extract specific information and analyze each conversation.
 
@@ -150,7 +187,6 @@ suggested_followup_message: A message we could send to re-engage this customer
 ```
 
 Do not include any explanations or additional text outside the YAML block.""",
-        
         "meta.yml": """---
 name: "{recipe_name}"
 description: "{description}"
@@ -202,7 +238,6 @@ validation_enums:
 #   sheet_id: "your-sheet-id-here"
 #   worksheet_name: "your-worksheet-name"
 """,
-        
         "README.md": """# {recipe_name}
 
 {description}
@@ -237,13 +272,14 @@ The recipe produces:
 Created by: {author}
 Creation date: {date}
 """,
-        
         "__init__.py": "",  # Empty init file
     }
-    
+
     # Add analyzer.py if needed
     if template_type in ["analyzer", "custom"]:
-        templates["analyzer.py"] = '''import json
+        templates[
+            "analyzer.py"
+        ] = '''import json
 import re
 from datetime import datetime
 
@@ -299,10 +335,12 @@ if __name__ == '__main__':
     result = analyze_conversation(sample_conversation)
     print(f"Analysis result: {result}")
 '''
-    
+
     # Add __main__.py if needed
     if template_type in ["main", "custom"]:
-        templates["__main__.py"] = '''#!/usr/bin/env python
+        templates[
+            "__main__.py"
+        ] = '''#!/usr/bin/env python
 """
 {recipe_name} Recipe
 -----------------------------
@@ -387,7 +425,8 @@ def query_bigquery(phone_numbers: List[str]) -> Dict[str, List[Dict[str, Any]]]:
     try:
         # Run the query using the client's query method
         logger.info(f"Querying BigQuery for {{len(phone_numbers)}} phone numbers")
-        df = client.query(query, params=query_params)
+        chunks = list(client.query(query, params=query_params))
+        df = pd.concat(chunks, ignore_index=True) if chunks else pd.DataFrame()
         
         # Group by phone number
         conversations = {{}}
@@ -538,7 +577,7 @@ if __name__ == "__main__":
             continue
         if filename == "__main__.py" and template_type not in ["main", "custom"]:
             continue
-            
+
         try:
             file_path = recipe_dir / filename
             with open(file_path, "w") as f:
@@ -547,44 +586,56 @@ if __name__ == "__main__":
                     recipe_name=recipe_name,
                     description=description,
                     author=author,
-                    date=datetime.now().strftime("%Y-%m-%d")
+                    date=datetime.now().strftime("%Y-%m-%d"),
                 )
                 f.write(content)
             created_files.append(file_path)
             print(f"Created file: {file_path}")
         except Exception as e:
             print(f"Failed to create file {filename}: {e}")
-    
-    print(f"\nRecipe '{recipe_name}' created successfully with {len(created_files)} files!")
-    print(f"To run this recipe: python -m lead_recovery.cli.main run --recipe {recipe_name}")
-    
+
+    print(
+        f"\nRecipe '{recipe_name}' created successfully with {len(created_files)} files!"
+    )
+    print(
+        f"To run this recipe: python -m lead_recovery.cli.main run --recipe {recipe_name}"
+    )
+
     # Add more comprehensive workflow instructions
     print("\nComplete Recipe Workflow:")
     print("1. Recipe files created in:")
     print(f"   {recipe_dir}/")
-    
+
     # Check if the recipe has redshift.sql (for proper instructions)
     has_redshift = (recipe_dir / "redshift.sql").exists()
     if has_redshift:
         print("2. When you run the recipe, it will:")
-        print(f"   a. Query Redshift using recipes/{recipe_name}/redshift.sql to get leads")
+        print(
+            f"   a. Query Redshift using recipes/{recipe_name}/redshift.sql to get leads"
+        )
         print(f"   b. Save leads to output_run/{recipe_name}/leads.csv")
     else:
         print("2. Since this recipe doesn't include redshift.sql, you'll need to:")
         print(f"   a. Manually create output_run/{recipe_name}/ directory")
         print("   b. Place a leads.csv file with a 'cleaned_phone' column there")
         print("   c. Or run with: --skip-redshift flag")
-    
+
     print("3. The recipe will then:")
-    print(f"   a. Query BigQuery using recipes/{recipe_name}/bigquery.sql for conversations")
-    print(f"   b. Analyze conversations using {'analyzer.py (custom logic)' if template_type in ['analyzer', 'custom'] else 'prompt.txt (LLM)'}")
-    print(f"   c. Generate results in output_run/{recipe_name}/<timestamp>/analysis.csv")
+    print(
+        f"   a. Query BigQuery using recipes/{recipe_name}/bigquery.sql for conversations"
+    )
+    print(
+        f"   b. Analyze conversations using {'analyzer.py (custom logic)' if template_type in ['analyzer', 'custom'] else 'prompt.txt (LLM)'}"
+    )
+    print(
+        f"   c. Generate results in output_run/{recipe_name}/<timestamp>/analysis.csv"
+    )
     print("   d. Create a 'latest.csv' symbolic link to the most recent analysis.csv")
-    
+
     print("\nTo check the results after running:")
     print(f"1. Look in: output_run/{recipe_name}/<timestamp>/")
     print(f"2. Or use the convenience link: output_run/{recipe_name}/latest.csv")
-    
+
     print("\nAdvanced Recipe Customization:")
     print("1. You can specify custom filenames in meta.yml:")
     print("   ```yaml")
@@ -593,33 +644,60 @@ if __name__ == "__main__":
     print(f"   prompt_file: {recipe_name}_prompt.txt")
     print("   ```")
     print("2. This is the approach used by the simulation_to_handoff recipe.")
-    
-    print("\nNOTE: All generated recipes use schema version 2. If you see a schema version error, update your meta.yml accordingly.")
-    
-    print("\nNOTE: After creating your recipe, run the validation script or CLI command to ensure compliance:")
+
+    print(
+        "\nNOTE: All generated recipes use schema version 2. If you see a schema version error, update your meta.yml accordingly."
+    )
+
+    print(
+        "\nNOTE: After creating your recipe, run the validation script or CLI command to ensure compliance:"
+    )
     print("  python scripts/validate_all_recipes.py")
     print("  or: python -m lead_recovery.cli.main validate-recipes")
-    
+
     print("\n✅ Recipe created!")
-    print(f"- meta.yml, prompt.txt, bigquery.sql, redshift.sql, README.md in recipes/{recipe_name}/")
-    print("\nNext step: Run `python scripts/validate_all_recipes.py` to check your recipe.")
+    print(
+        f"- meta.yml, prompt.txt, bigquery.sql, redshift.sql, README.md in recipes/{recipe_name}/"
+    )
+    print(
+        "\nNext step: Run `python scripts/validate_all_recipes.py` to check your recipe."
+    )
     print("Or see the FOR DUMMIES guide: documentation/for_dummies_recipe_guide.md\n")
-    
+
     return True
 
+
 def main():
-    parser = argparse.ArgumentParser(description="Create a new recipe for the Lead Recovery Pipeline")
-    parser.add_argument("recipe_name", help="Name of the recipe (use underscores instead of spaces)")
-    parser.add_argument("--description", "-d", default="Custom recipe for lead analysis", 
-                        help="Short description of the recipe's purpose")
-    parser.add_argument("--author", "-a", default=os.environ.get("USER", "Unknown"), 
-                        help="Name of the recipe creator")
-    parser.add_argument("--template", "-t", choices=["basic", "analyzer", "main", "custom"], default="basic",
-                        help="Type of template to use: basic (minimal), analyzer (with custom analyzer.py), "
-                             "main (with __main__.py), or custom (with both)")
-    
+    parser = argparse.ArgumentParser(
+        description="Create a new recipe for the Lead Recovery Pipeline"
+    )
+    parser.add_argument(
+        "recipe_name", help="Name of the recipe (use underscores instead of spaces)"
+    )
+    parser.add_argument(
+        "--description",
+        "-d",
+        default="Custom recipe for lead analysis",
+        help="Short description of the recipe's purpose",
+    )
+    parser.add_argument(
+        "--author",
+        "-a",
+        default=os.environ.get("USER", "Unknown"),
+        help="Name of the recipe creator",
+    )
+    parser.add_argument(
+        "--template",
+        "-t",
+        choices=["basic", "analyzer", "main", "custom"],
+        default="basic",
+        help="Type of template to use: basic (minimal), analyzer (with custom analyzer.py), "
+        "main (with __main__.py), or custom (with both)",
+    )
+
     args = parser.parse_args()
     create_recipe(args.recipe_name, args.description, args.author, args.template)
 
+
 if __name__ == "__main__":
-    main() 
+    main()
