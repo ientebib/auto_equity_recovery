@@ -17,7 +17,7 @@ logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-def test_recipe(recipe_name: str) -> bool:
+def run_recipe_test(recipe_name: str) -> bool:
     """Test the ProcessorRunner with the specified recipe and validate referenced files and enums."""
     logger.info(f"\n==== TESTING RECIPE: {recipe_name} ====")
     
@@ -121,7 +121,7 @@ def test_all_recipes():
     
     results = {}
     for recipe in recipes:
-        results[recipe] = test_recipe(recipe)
+        results[recipe] = run_recipe_test(recipe)
     
     # Print summary
     logger.info("\n==== TEST SUMMARY ====")

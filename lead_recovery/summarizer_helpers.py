@@ -152,7 +152,7 @@ def clean_response_text(raw_text: str, yaml_terminator_key: str = "suggested_mes
     
     # Make sure transfer_context_analysis has a value if missing (moved this check to after other cleaning)
     if "transfer_context_analysis" not in cleaned:
-        cleaned = cleaned.rstrip() + '\\ntransfer_context_analysis: "N/A"'
+        cleaned = cleaned.rstrip() + "\ntransfer_context_analysis: \"N/A\""
 
     return cleaned.strip() # Ensure stripping whitespace again
 
