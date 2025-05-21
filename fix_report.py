@@ -8,6 +8,7 @@ and creates a report with the desired columns.
 import glob
 import os
 import re
+import sys
 
 import pandas as pd
 import yaml
@@ -16,7 +17,7 @@ import yaml
 run_dirs = glob.glob("output_run/marzo_cohorts/2025-05-*/")
 if not run_dirs:
     print("No run directories found.")
-    exit(1)
+    sys.exit(1)
 
 latest_run = max(run_dirs)
 print(f"Using latest run: {latest_run}")
