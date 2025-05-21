@@ -34,7 +34,7 @@ python -m lead_recovery.cli.main run --recipe simulation_to_handoff
 | `--recipes-dir` | TEXT | None | Override recipes directory path (default: recipes/ in project root) |
 | `--skip-redshift / --no-skip-redshift` | FLAG | `--no-skip-redshift` | Skip fetching leads from Redshift |
 | `--skip-bigquery / --no-skip-bigquery` | FLAG | `--no-skip-bigquery` | Skip fetching conversations from BigQuery |
-| `--skip-summarize / --no-skip-summarize` | FLAG | `--no-skip-summarize` | Skip summarizing conversations with LLM |
+| `--skip-summarize / --no-skip-summarize` | FLAG | `--skip-summarize` | Skip summarizing conversations with LLM |
 | `--max-workers` | INTEGER | None | Max concurrent workers for OpenAI calls |
 | `--output-dir` | TEXT | None | Override base output directory |
 | `--use-cached-redshift / --no-use-cached-redshift` | FLAG | `--use-cached-redshift` | Use cached Redshift data if available |
