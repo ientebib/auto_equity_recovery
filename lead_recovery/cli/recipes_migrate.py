@@ -12,10 +12,12 @@ Features:
 - Backs up old meta.yml before overwriting (unless --no-backup)
 - Supports --dry-run to preview changes
 """
+import shutil
+from pathlib import Path
+
 import typer
 import yaml
-from pathlib import Path
-import shutil
+
 from lead_recovery.processors._registry import get_columns_for_processor
 
 app = typer.Typer()

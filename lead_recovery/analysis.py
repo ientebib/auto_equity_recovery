@@ -165,14 +165,7 @@ async def run_summarization_step(
     else:
         output_columns = None  # Or set a sensible default if needed
     
-    # Calculate effective skip flags (can be used for processor logic, but not for columns)
-    effective_skip_temporal_flags = (
-        skip_detailed_temporal_calc and
-        skip_hours_minutes and
-        skip_reactivation_flags and
-        skip_timestamps and
-        skip_user_message_flag
-    )
+
     
     # Removed deprecated python_flag_columns logic
     

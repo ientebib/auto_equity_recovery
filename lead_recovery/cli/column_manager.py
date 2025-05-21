@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Dict, List
 
 import yaml
+
 from lead_recovery.processors._registry import get_columns_for_processor
 
 logger = logging.getLogger(__name__)

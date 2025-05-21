@@ -3,10 +3,14 @@ import re
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Any, Dict, List
 
 # PyYAML fallback
 import yaml as _pyyaml
+
+from lead_recovery.cli.update_output_columns import DEFAULT_LEAD_COLUMNS
+from lead_recovery.processors._registry import PROCESSOR_REGISTRY
+
 try:
     from ruamel.yaml import YAML as _RuYAML
     YAML = _RuYAML
@@ -15,8 +19,6 @@ except ImportError:
 
 yaml = _pyyaml
 
-from lead_recovery.processors._registry import PROCESSOR_REGISTRY
-from lead_recovery.cli.update_output_columns import DEFAULT_LEAD_COLUMNS
 
 def load_meta_yml(recipe_path: Path) -> Dict[str, Any]:
     meta_path = recipe_path / "meta.yml"
