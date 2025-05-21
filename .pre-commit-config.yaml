@@ -28,10 +28,10 @@ repos:
       - id: ruff-format
         files: ^(lead_recovery/|tests/)
 
-- repo: local
-  hooks:
-    - id: validate-recipes
-      name: Validate all recipes
-      entry: python scripts/validate_all_recipes.py
-      language: system
-      types: [yaml] 
+  - repo: local
+    hooks:
+      - id: validate-recipes
+        name: Validate all recipes
+        entry: python scripts/validate_all_recipes.py
+        language: system
+        types: [yaml]
