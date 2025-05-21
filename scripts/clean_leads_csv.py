@@ -2,7 +2,6 @@ import csv
 import sys
 from pathlib import Path
 
-
 USAGE = """Clean a leads.csv file by keeping only rows where cleaned_phone is a 10-digit number.
 
 Usage:

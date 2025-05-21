@@ -1,18 +1,23 @@
-import streamlit as st
-from pathlib import Path
-import os
-import sys
-import subprocess
-import json
 import importlib
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+import streamlit as st
 
 # Ensure webui path is on sys.path
 sys.path.append(str(Path(__file__).parent))
-from webui.utils.recipe_builder_helpers import (
-    list_processors, load_meta_yml, list_default_lead_columns, extract_yaml_keys_from_prompt, save_meta_yml
-)
 from lead_recovery.cli.update_output_columns import update_output_columns
 from lead_recovery.recipe_schema import RecipeMeta
+from webui.utils.recipe_builder_helpers import (
+    extract_yaml_keys_from_prompt,
+    list_default_lead_columns,
+    list_processors,
+    load_meta_yml,
+    save_meta_yml,
+)
 
 RECIPES_DIR = Path(__file__).parent.parent / "recipes"
 DOC_PATH = Path(__file__).parent.parent / "documentation/for_dummies_recipe_guide.md"
@@ -381,7 +386,7 @@ elif st.session_state.step == 6:
             if result.returncode == 0:
                 save_success = f"Recipe '{recipe_name}' saved and validated successfully!"
             else:
-                save_error = f"Validation failed! See output below."
+                save_error = "Validation failed! See output below."
         except Exception as e:
             save_error = str(e)
     if backup_status:

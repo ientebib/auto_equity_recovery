@@ -2,8 +2,8 @@ from typing import Any, Dict, Optional
 
 import pandas as pd
 
-from .base import BaseProcessor
 from ._registry import register_processor
+from .base import BaseProcessor
 
 
 @register_processor

@@ -11,10 +11,12 @@ Features:
 - Preserves order if possible
 - Supports --dry-run and --backup
 """
+import shutil
+from pathlib import Path
+
 import typer
 import yaml
-from pathlib import Path
-import shutil
+
 from lead_recovery.processors._registry import get_columns_for_processor
 
 app = typer.Typer()

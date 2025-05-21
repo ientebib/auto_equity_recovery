@@ -1,14 +1,21 @@
 """Main entry point for CLI commands."""
 import logging
+import subprocess
 import sys
 from typing import List, Optional
 
 import typer
-import subprocess
 
-from . import app, fetch_convos, fetch_leads, report, run, summarize
-from . import recipes_migrate  # Migration helper CLI
-from . import update_output_columns  # Output columns updater CLI
+from . import (
+    app,
+    fetch_convos,
+    fetch_leads,
+    recipes_migrate,  # Migration helper CLI
+    report,
+    run,
+    summarize,
+    update_output_columns,  # Output columns updater CLI
+)
 
 # Configure main CLI application
 logger = logging.getLogger(__name__)

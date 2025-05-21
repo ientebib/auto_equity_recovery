@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 import yaml
 from pydantic import ValidationError
@@ -164,4 +165,87 @@ class RecipeLoader:
             d.name
             for d in self.recipes_base_dir.iterdir()
             if d.is_dir() and (d / _DEFAULT_META_YML_FILENAME).exists()
-        ] 
+        ]
+
+
+# --------------------------------------------------------------------------- #
+# Legacy Helper API
+# --------------------------------------------------------------------------- #
+
+
+@dataclass
+class LoadedRecipe:
+    """Simple container for a loaded recipe used by tests."""
+
+    name: str
+    path: Path
+    redshift_sql_path: Path
+    bigquery_sql_path: Optional[Path]
+    prompt_path: Path
+    meta_path: Path
+    meta: Dict[str, Any]
+
+
+def _recipe_root() -> Path:
+    return _DEFAULT_PROJECT_ROOT / _DEFAULT_RECIPES_DIR_NAME
+
+
+def list_recipes() -> List[str]:
+    """Return available recipe directories sorted alphabetically."""
+    recipes_dir = _recipe_root()
+    if not recipes_dir.exists():
+        return []
+    return sorted(
+        p.name for p in recipes_dir.iterdir() if p.is_dir() and (p / _DEFAULT_META_YML_FILENAME).exists()
+    )
+
+
+def load_recipe(name: str) -> LoadedRecipe:
+    """Load a recipe folder and return a ``LoadedRecipe`` instance."""
+    recipes_dir = _recipe_root()
+    dir_path = recipes_dir / name
+    if not dir_path.exists():
+        raise FileNotFoundError(f"Recipe '{name}' does not exist under '{recipes_dir}'.")
+
+    meta_path = dir_path / _DEFAULT_META_YML_FILENAME
+    if not meta_path.exists():
+        raise FileNotFoundError(f"meta.yml not found for recipe '{name}'.")
+
+    with open(meta_path, "r", encoding="utf-8") as f:
+        meta_dict: Dict[str, Any] = yaml.safe_load(f) or {}
+
+    required_fields = [
+        "name",
+        "output_columns",
+        "dashboard_title",
+        "summary_format",
+        "redshift_sql",
+        "prompt_file",
+    ]
+    for field in required_fields:
+        if field not in meta_dict:
+            raise ValueError(f"Missing required field '{field}' in {meta_path}")
+
+    redshift_sql_path = dir_path / meta_dict.get("redshift_sql", "redshift.sql")
+    bigquery_sql_path = dir_path / meta_dict.get("bigquery_sql", "bigquery.sql")
+    prompt_path = dir_path / meta_dict.get("prompt_file", "prompt.txt")
+
+    missing: List[str] = []
+    if not redshift_sql_path.exists():
+        missing.append(redshift_sql_path.name)
+    if not prompt_path.exists():
+        missing.append(prompt_path.name)
+    if missing:
+        raise FileNotFoundError(
+            f"Recipe '{name}' is missing required file(s): {', '.join(missing)}"
+        )
+
+    return LoadedRecipe(
+        name=name,
+        path=dir_path,
+        redshift_sql_path=redshift_sql_path,
+        bigquery_sql_path=bigquery_sql_path if bigquery_sql_path.exists() else None,
+        prompt_path=prompt_path,
+        meta_path=meta_path,
+        meta=meta_dict,
+    )
