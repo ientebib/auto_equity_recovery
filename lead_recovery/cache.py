@@ -591,7 +591,7 @@ class SummaryCache:
         finally:
             conn.close()
             
-    async def load_all_cached_results(self) -> Dict[str, Dict[str, Any]]:
+    def load_all_cached_results(self) -> Dict[str, Dict[str, Any]]:
         """Load all cached results for a specific model.
         
         Returns:

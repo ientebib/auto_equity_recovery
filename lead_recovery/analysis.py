@@ -115,7 +115,7 @@ async def run_summarization_step(
     
     if use_cache:
         cache = SummaryCache(output_dir)
-        cached_results = await cache.load_all_cached_results() if hasattr(cache, 'load_all_cached_results') else {}
+        cached_results = cache.load_all_cached_results() if hasattr(cache, 'load_all_cached_results') else {}
         conversation_digests = {k: v.get("conversation_digest", "") for k, v in cached_results.items()}
     
     # Log all skip flags for debugging
