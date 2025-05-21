@@ -64,6 +64,7 @@ python_processors:
 output_columns:
   - lead_id
   - user_id
+  - clean_email
   - lead_created_at
   - name
   - last_name
@@ -85,4 +86,9 @@ output_columns:
   # Meta data at the end
   - last_user_message_text
   - last_kuna_message_text
-  - last_message_sender 
+  - last_message_sender
+
+custom_analyzer_params:
+  google_sheets:
+    sheet_id: "1466ljSang2OBqqgn6XWGVXUS2JQ7VPcbEJ6eYYG-WO8"
+    worksheet_name: "perfAp-handoff" 

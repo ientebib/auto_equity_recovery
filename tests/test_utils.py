@@ -14,4 +14,4 @@ from lead_recovery.utils import clean_email
 )
 def test_clean_email(raw, expected):
     """clean_email should lower-case and strip plus-aliases."""
-    assert clean_email(raw) == expected 
+    assert clean_email(raw) == expected

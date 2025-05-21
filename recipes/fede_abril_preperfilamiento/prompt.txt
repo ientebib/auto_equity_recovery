@@ -22,13 +22,14 @@ Tu objetivo es analizar el texto de la conversación (`{conversation_text}`), ju
 Kuna AutoEquity ofrece préstamos personales usando el vehículo PROPIO del cliente (totalmente pagado) como garantía. El cliente conserva el vehículo. NO es para COMPRAR un vehículo.
 
 ## PROCESO DE ANÁLISIS Y CAMPOS DE SALIDA REQUERIDOS (Formato YAML Estricto)
-**Principio Guía General:** Los campos `current_engagement_status`, `primary_stall_reason_code`, y `next_action_code` están interconectados. Tu análisis del `{conversation_text}` y las variables Python debe llevar a una conclusión coherente entre los tres. Un `primary_stall_reason_code` definitivo (ej. inelegibilidad o `NUNCA_RESPONDIO`) debe dictar los otros dos campos.
+Debes generar una salida en formato YAML que contenga ÚNICAMENTE los siguientes 7 campos, en ESTE ORDEN EXACTO. NO INCLUYAS NINGÚN OTRO CAMPO ADICIONAL. Utiliza únicamente los valores de enumeración (enum) proporcionados para los campos que los requieren.
 
-Genera un YAML con estos campos EXACTOS y en ESTE ORDEN:
+**Principio Guía para la Coherencia:** Los campos `current_engagement_status`, `primary_stall_reason_code`, y `next_action_code` están interconectados. Tu análisis del `{conversation_text}` y las variables Python debe llevar a una conclusión coherente entre los tres. Un `primary_stall_reason_code` definitivo (ej. inelegibilidad o `NUNCA_RESPONDIO`) debe dictar los otros dos campos.
 
 **1. `summary`:** (Máx. 20-30 palabras)
     *   Si `NO_USER_MESSAGES_EXIST` es `True`, el `summary` debe ser "Cliente nunca respondió al contacto inicial.".
     *   En otros casos, provee un resumen conciso (máx. 20-30 palabras) del estado de la conversación y la razón del estancamiento o el interés del cliente. Ej: "Dejó de responder tras consultar términos."
+    *   Ej: "Usuario interesado pero duda de tasas, recontactar con info." o "Caso estancado más de 48h, último intento." o "Inconsistencia detectada, requiere análisis."
 
 **2. `current_engagement_status`:**
     *   Evalúa el nivel de compromiso actual. Prioriza tu análisis del `{conversation_text}` para identificar estados claros y luego usa las variables Python como apoyo. Si identificas un `primary_stall_reason_code` claro que indique inelegibilidad o `NUNCA_RESPONDIO`, esto debe guiar fuertemente la elección aquí. Usa ÚNICAMENTE uno de estos valores:
@@ -95,7 +96,11 @@ Genera un YAML con estos campos EXACTOS y en ESTE ORDEN:
     *   **Taxonomía `primary_stall_reason_code` (Elige UNO ESTRICTAMENTE. Recuerda la regla para `NUNCA_RESPONDIO`):**
         `NUNCA_RESPONDIO`, `FINANCIAMIENTO_ACTIVO`, `VEHICULO_ANTIGUO_KM`, `NO_PROPIETARIO`, `VIN_EXTRANJERO`, `ZONA_NO_CUBIERTA`, `USUARIO_SIN_AUTO`, `RECHAZADO_POR_KUNA`, `PRODUCTO_INCORRECTO_COMPRADOR`, `OTRO_PROCESO_DE_NEGOCIO`, `DESINTERES_EXPLICITO`, `ADEUDO_VEHICULAR_MULTAS`, `PROBLEMA_SEGUNDA_LLAVE`, `PROBLEMA_TERMINOS`, `ERROR_PROCESO_INTERNO`, `PROCESO_EN_CURSO`, `GHOSTING`, `OTRO`
 
-**4. `next_action_code`:**
+**4. `transfer_context_analysis`:**
+    *   Si la variable Python `human_transfer` es `True`, analiza el último mensaje del usuario ANTES de la transferencia (disponible en `{conversation_text}`) y explica brevemente (máx. 20 palabras) por qué la IA inicial probablemente falló o por qué se requirió la transferencia.
+    *   Si la variable Python `human_transfer` es `False`, pon "N/A".
+
+**5. `next_action_code`:**
     *   Acción recomendada basada en el análisis holístico, especialmente `primary_stall_reason_code` y `current_engagement_status`.
     *   **Lógica de Decisión:**
         1.  Si `primary_stall_reason_code` es `NUNCA_RESPONDIO` -> `LLAMAR_LEAD_NUNCA_RESPONDIO`.
@@ -114,14 +119,29 @@ Genera un YAML con estos campos EXACTOS y en ESTE ORDEN:
     *   **Taxonomía `next_action_code` (Elige UNO ESTRICTAMENTE):**
         `LLAMAR_LEAD_NUNCA_RESPONDIO`, `CERRAR_CASO`, `ESCALAR_CASO_A_HUMANO`, `RESPONDER_AL_CLIENTE`, `MONITOREAR_CONVERSACION`, `PROGRAMAR_RECONTACTO_AUTOMATICO`, `PROGRAMAR_RECONTACTO_ESPECIAL`, `REVISAR_MANUALMENTE`
 
-**5. `follow_up_attempts`:**
+**6. `follow_up_attempts`:**
     *   Si `next_action_code` es `PROGRAMAR_RECONTACTO_AUTOMATICO` o `PROGRAMAR_RECONTACTO_ESPECIAL`, indica el número de intentos de seguimiento ya realizados o que este nuevo recontacto representaría. Este es un campo numérico. Si no aplica, usa 0.
     *   Ejemplo: Si ya hubo 2 intentos y programas otro, sería 3.
 
-**6. `next_action_context`:**
+**7. `next_action_context`:**
     *   Proporciona un breve contexto o justificación para la `next_action_code` seleccionada, especialmente si la lógica no es trivial o si se elige `REVISAR_MANUALMENTE` o `ESCALAR_CASO_A_HUMANO`. Máximo 15-20 palabras.
+    *   **Importante**: Este campo es para un contexto breve de la acción. No intentes incluir análisis extensos. No incluyas NINGÚN OTRO CAMPO o sub-estructura aquí. **DEBE SER UNA CADENA DE TEXTO SIMPLE Y CORTA, SIN SALTOS DE LÍNEA NI ESTRUCTURAS YAML INTERNAS.**
     *   Ej: "Usuario interesado pero duda de tasas, recontactar con info." o "Caso estancado más de 48h, último intento." o "Inconsistencia detectada, requiere análisis."
 
+## FORMATO DE SALIDA ESTRICTO (YAML)
+# Asegúrate de que tu respuesta YAML siga exactamente este formato, utilizando solo los nombres de campo especificados.
+# Para los campos con valores de enumeración (enum), proporciona el valor EXACTO de la lista permitida SIN COMILLAS.
+# El campo `follow_up_attempts` debe ser un NÚMERO ENTERO (ej. 0, 1, 2), no un string.
+```yaml
+summary: "Resumen conciso aquí (máx. 20-30 palabras)."
+current_engagement_status: UN_VALOR_DEL_ENUM_PROPORCIONADO
+primary_stall_reason_code: UN_VALOR_DEL_ENUM_PROPORCIONADO
+transfer_context_analysis: "Análisis de transferencia o N/A."
+next_action_code: UN_VALOR_DEL_ENUM_PROPORCIONADO
+follow_up_attempts: 0
+next_action_context: "Contexto simple en una sola línea. SIN saltos de línea."
+```
+
 ---
-FIN DE LAS INSTRUCCIONES. ASEGÚRATE DE QUE LA SALIDA SEA UN YAML VÁLIDO Y COMPLETO CON TODOS LOS CAMPOS REQUERIDOS.
+FIN DE LAS INSTRUCCIONES. ASEGÚRATE DE QUE LA SALIDA SEA UN YAML VÁLIDO Y COMPLETO CON TODOS LOS CAMPOS REQUERIDOS Y NINGUNO MÁS.
 ---

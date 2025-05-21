@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional
 import pandas as pd  # Assuming conversation data might be a DataFrame
 
 from lead_recovery.recipe_schema import RecipeMeta  # For type hinting of recipe_config
+
 # NOTE: All processor subclasses should be decorated with @register_processor from ._registry
 # Example:
 # from ._registry import register_processor

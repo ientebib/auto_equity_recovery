@@ -1,88 +1,89 @@
--- First extract just the leads we need to a result set (now potentially larger due to 90-day window)
-WITH simulation_lead_ids AS (
-    SELECT DISTINCT ld.id AS lead_id
-    FROM financing_acceptation_api_global_refined.financing_leads_data ld
-    JOIN financing_acceptation_api_global_refined.leads_audit la
-        ON ld.id = la.lead_id
-    WHERE
-        ld.product = 'f079451e-04dd-4741-b7e0-ee6ddedc6b7d'
-        -- Changed from -7 to -90 to fetch the last 90 days
-        AND ld.create_date >= DATEADD(day, -20, CURRENT_DATE)
-        AND la.field = 'SIMULATION' AND la.new_value IS NOT NULL
-),
--- Get the full lead data with cleaned emails, for the leads that matter
-leads_with_simulation AS (
+WITH
+  lead_data AS (
     SELECT
-        ld.id AS lead_id,
-        ld.user_id,
-        ld.create_date,
-        ld.user_email,
-        ld.product,
-        LOWER(
-            CASE
-            WHEN POSITION('+' IN ld.user_email) > 0
-            THEN SUBSTRING(ld.user_email, 1, POSITION('+' IN ld.user_email)-1)
-                 || SUBSTRING(ld.user_email, POSITION('@' IN ld.user_email))
-            ELSE ld.user_email
-            END
-        ) AS cleaned_email
+      ld.id  AS lead_id,
+      ld.user_id,
+      LOWER(
+        CASE
+          WHEN POSITION('+' IN ld.user_email) > 0 THEN
+            SUBSTRING(ld.user_email FROM 1 FOR POSITION('+' IN ld.user_email)-1)
+            || SUBSTRING(ld.user_email FROM POSITION('@' IN ld.user_email))
+          ELSE ld.user_email
+        END
+      )        AS clean_email,
+      ld.create_date AS lead_created_at,
+      ld.profiling_status
     FROM financing_acceptation_api_global_refined.financing_leads_data ld
-    JOIN simulation_lead_ids sim ON ld.id = sim.lead_id
-),
--- Find which of our selected leads entered handoff (single pass through leads_audit)
-entered_handoff_leads AS (
+    WHERE ld.product = 'f079451e-04dd-4741-b7e0-ee6ddedc6b7d'
+      AND ld.create_date >= DATEADD(day, -20, CURRENT_DATE)
+  ),
+  entered_handoff AS (
     SELECT DISTINCT lead_id
     FROM financing_acceptation_api_global_refined.leads_audit
-    WHERE
-        field = 'OFFER_STATUS'
-        AND new_value = 'ENTERED'
-        AND lead_id IN (SELECT lead_id FROM leads_with_simulation)
-),
--- Get the lead emails for intent matching
-lead_emails AS (
-    SELECT DISTINCT cleaned_email
-    FROM leads_with_simulation
-),
--- Get only relevant intents (minimizing the join against the large intents table)
-relevant_intents AS (
-    SELECT
-        i.id AS intent_id,
-        i.email,
-        i.name,
-        i.last_name,
-        i.phone_number,
-        i.updated_at,
-        LOWER(
-            CASE
-            WHEN POSITION('+' IN i.email) > 0
-            THEN SUBSTRING(i.email FROM 1 FOR POSITION('+' IN i.email) - 1) || SUBSTRING(i.email FROM POSITION('@' IN i.email))
-            ELSE i.email
-            END
-        ) AS cleaned_email
-    FROM kuna_data_api_global_refined.intents i
-    JOIN lead_emails le ON le.cleaned_email = LOWER(
-        CASE
-        WHEN POSITION('+' IN i.email) > 0
-        THEN SUBSTRING(i.email FROM 1 FOR POSITION('+' IN i.email) - 1) || SUBSTRING(i.email FROM POSITION('@' IN i.email))
-        ELSE i.email
-        END
-    )
-),
-latest_intent_per_email AS (
+    WHERE field = 'OFFER_STATUS'
+      AND new_value = 'ENTERED'
+  ),
+  eligible_leads AS (
+    SELECT ld.*
+    FROM lead_data ld
+    LEFT JOIN entered_handoff eh USING (lead_id)
+    WHERE eh.lead_id IS NULL
+      AND (ld.profiling_status IS NULL OR RIGHT(ld.profiling_status,1) <> 'R')
+  ),
+  ranked_leads AS (
     SELECT *,
-        ROW_NUMBER() OVER (PARTITION BY cleaned_email ORDER BY updated_at DESC, intent_id DESC) AS rn
-    FROM relevant_intents
-)
--- Final selection: Leads with simulation, not in handoff, joined with latest intent info
+           ROW_NUMBER() OVER (PARTITION BY clean_email ORDER BY lead_created_at DESC, lead_id DESC) AS rn
+    FROM eligible_leads
+  ),
+  latest_lead_per_email AS (
+    SELECT lead_id,
+           user_id,
+           clean_email,
+           lead_created_at
+    FROM ranked_leads
+    WHERE rn = 1
+  ),
+  intents_clean AS (
+    SELECT
+      i.id,
+      LOWER(
+        CASE
+          WHEN POSITION('+' IN i.email) > 0 THEN
+            SUBSTRING(i.email FROM 1 FOR POSITION('+' IN i.email)-1)
+            || SUBSTRING(i.email FROM POSITION('@' IN i.email))
+          ELSE i.email
+        END
+      )                       AS cleaned_email,
+      i.name,
+      i.last_name,
+      RIGHT(i.phone_number,10) AS cleaned_phone_number,
+      i.updated_at
+    FROM kuna_data_api_global_refined.intents i
+  ),
+  ranked_intents AS (
+    SELECT *,
+           ROW_NUMBER() OVER (PARTITION BY cleaned_email ORDER BY updated_at DESC, id DESC) AS rn
+    FROM intents_clean
+    WHERE cleaned_email IN (SELECT clean_email FROM latest_lead_per_email)
+  ),
+  latest_intent AS (
+    SELECT cleaned_email,
+           name,
+           last_name,
+           cleaned_phone_number
+    FROM ranked_intents
+    WHERE rn = 1
+  )
 SELECT
-    lws.lead_id,
-    lws.user_id,
-    DATEADD(hour, -6, lws.create_date) AS lead_created_at, -- Adjust timezone
-    li.name,
-    li.last_name,
-    RIGHT(li.phone_number, 10) AS cleaned_phone_number -- Extract last 10 digits of phone
-FROM leads_with_simulation lws
-JOIN latest_intent_per_email li ON lws.cleaned_email = li.cleaned_email AND li.rn = 1
-LEFT JOIN entered_handoff_leads hel ON lws.lead_id = hel.lead_id
-WHERE hel.lead_id IS NULL -- Keep only leads NOT found in entered_handoff_leads
-ORDER BY lead_created_at DESC, lws.lead_id;
+  lle.lead_id,
+  lle.user_id,
+  lle.clean_email,
+  li.name,
+  li.last_name,
+  li.cleaned_phone_number,
+  lle.lead_created_at
+FROM latest_lead_per_email AS lle
+LEFT JOIN latest_intent AS li
+  ON lle.clean_email = li.cleaned_email
+WHERE li.cleaned_phone_number IS NOT NULL
+ORDER BY lle.lead_created_at DESC;

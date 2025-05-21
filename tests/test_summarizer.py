@@ -181,4 +181,4 @@ async def test_summarize_success():
                 # Check the result
                 assert "key1" in result
                 assert result["key1"] == "value1"
-                assert "conversation_digest" in result  # Should add metadata 
+                assert "conversation_digest" in result  # Should add metadata row

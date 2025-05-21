@@ -165,4 +165,5 @@ recipes/*/output_run/
 legacy/
 mock_conversations/
 *.log
-*.marker 
+*.marker gcp_service_account_key.json
+**/leads.csv

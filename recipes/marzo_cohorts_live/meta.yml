@@ -1,13 +1,12 @@
-recipe_name: "simulation_to_handoff"
+recipe_name: "marzo_cohorts_live"
 version: "v17"
 description: "Recipe for analyzing leads that reached simulation but not handoff (Time Aware)"
 recipe_schema_version: 2
 
 data_input:
-  lead_source_type: redshift
-  redshift_config:
-    sql_file: "simulation_to_handoff_redshift.sql"
-  conversation_sql_file_bigquery: "simulation_to_handoff_bigquery.sql"
+  lead_source_type: csv
+  csv_config:
+    csv_file: "leads.csv"
 
 llm_config:
   prompt_file: "prompt.txt"
@@ -21,6 +20,10 @@ llm_config:
       enum_values: [
         "NUNCA_RESPONDIO", "FINANCIAMIENTO_ACTIVO", "VEHICULO_ANTIGUO_KM", "NO_PROPIETARIO", "VIN_EXTRANJERO", "ZONA_NO_CUBIERTA", "USUARIO_SIN_AUTO", "RECHAZADO_POR_KUNA", "PRODUCTO_INCORRECTO_COMPRADOR", "OTRO_PROCESO_DE_NEGOCIO", "DESINTERES_EXPLICITO", "ADEUDO_VEHICULAR_MULTAS", "PROBLEMA_SEGUNDA_LLAVE", "PROBLEMA_TERMINOS", "ERROR_PROCESO_INTERNO", "PROCESO_EN_CURSO", "GHOSTING", "OTRO"
       ]
+    primary_stall_reason_reason_code:
+      description: "Typo from LLM for primary_stall_reason_code."
+      type: str
+      is_optional: true
     transfer_context_analysis:
       description: "Brief analysis of context around the human transfer, if applicable."
       type: str
@@ -28,11 +31,33 @@ llm_config:
       description: "Recommended next action for the lead."
       type: str
       enum_values: [
-        "CERRAR", "ESPERAR", "LLAMAR_LEAD", "CONTACTO_PRIORITARIO", "MANEJAR_OBJECION", "INSISTIR", "ENVIAR_PLANTILLA_RECUPERACION"
+        "CERRAR", "ESPERAR", "LLAMAR_LEAD", "CONTACTO_PRIORITARIO", "MANEJAR_OBJECION", "INSISTIR", "ENVIAR_PLANTILLA_RECUPERACION",
+        "LLAMAR_LEAD_NUNCA_RESPONDIO", "PROGRAMAR_RECONTACTO_ESPECIAL"
       ]
     suggested_message_es:
       description: "Suggested follow-up message in Spanish, if applicable."
       type: str
+      is_optional: true
+    conversation_digest:
+      description: "MD5 hash of the conversation content, used for caching."
+      type: str
+      is_optional: true
+    last_message_ts:
+      description: "Timestamp of the last message in the conversation, from LLM."
+      type: str
+      is_optional: true
+    follow_up_attempts:
+      description: "Number of follow-up attempts, from LLM."
+      type: str
+      is_optional: true
+    next_action_context:
+      description: "Context for the next action, from LLM."
+      type: str
+      is_optional: true
+    current_engagement_status:
+      description: "Current engagement status, from LLM."
+      type: str
+      is_optional: true
   context_keys_from_python: [
     "HOURS_MINUTES_SINCE_LAST_USER_MESSAGE",
     "HOURS_MINUTES_SINCE_LAST_MESSAGE",

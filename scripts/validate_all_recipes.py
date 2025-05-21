@@ -10,21 +10,15 @@ Usage:
   python scripts/validate_all_recipes.py
   python scripts/validate_all_recipes.py --only <recipe_name_or_path>
 """
+import argparse
 import sys
 from pathlib import Path
+
 import yaml
-import argparse
-from lead_recovery.recipe_schema import RecipeMeta
-from lead_recovery.processors._registry import get_columns_for_processor
 
 # Ensure all processors are registered
-import lead_recovery.processors.temporal
-import lead_recovery.processors.metadata
-import lead_recovery.processors.handoff
-import lead_recovery.processors.template
-import lead_recovery.processors.validation
-import lead_recovery.processors.conversation_state
-import lead_recovery.processors.human_transfer
+from lead_recovery.processors._registry import get_columns_for_processor
+from lead_recovery.recipe_schema import RecipeMeta
 
 RECIPES_DIR = Path(__file__).resolve().parent.parent / "recipes"
 

@@ -34,6 +34,9 @@ llm_config:
       enum_values: [
         "NUNCA_RESPONDIO", "FINANCIAMIENTO_ACTIVO", "VEHICULO_ANTIGUO_KM", "NO_PROPIETARIO", "VIN_EXTRANJERO", "ZONA_NO_CUBIERTA", "USUARIO_SIN_AUTO", "RECHAZADO_POR_KUNA", "PRODUCTO_INCORRECTO_COMPRADOR", "OTRO_PROCESO_DE_NEGOCIO", "DESINTERES_EXPLICITO", "ADEUDO_VEHICULAR_MULTAS", "PROBLEMA_SEGUNDA_LLAVE", "PROBLEMA_TERMINOS", "ERROR_PROCESO_INTERNO", "PROCESO_EN_CURSO", "GHOSTING", "OTRO"
       ]
+    transfer_context_analysis:
+      description: "Brief analysis of context around the human transfer, if applicable. N/A if no transfer."
+      type: str
     next_action_code:
       description: "Recommended next action for the lead."
       type: str
@@ -71,6 +74,8 @@ python_processors:
       max_message_length: 150
   - module: "lead_recovery.processors.handoff.HandoffProcessor"
     params: {}
+  - module: "lead_recovery.processors.human_transfer.HumanTransferProcessor"
+    params: {}
   - module: "lead_recovery.processors.template.TemplateDetectionProcessor"
     params:
       template_type: "recovery"
@@ -92,6 +97,7 @@ output_columns:
   - summary
   - current_engagement_status
   - primary_stall_reason_code
+  - transfer_context_analysis
   - next_action_code
   - follow_up_attempts
   - next_action_context

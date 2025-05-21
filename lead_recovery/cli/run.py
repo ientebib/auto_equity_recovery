@@ -421,12 +421,14 @@ def handle_summarize_stage(skip_summarize: bool, output_dir: Path, prompt_path: 
     
     # Get Google Sheets configuration from recipe_meta
     gsheet_config = None
-    if hasattr(recipe_meta, 'google_sheets') and recipe_meta.google_sheets:
-        sheet_id = getattr(recipe_meta.google_sheets, 'sheet_id', None)
-        worksheet = getattr(recipe_meta.google_sheets, 'worksheet_name', None)
-        if sheet_id and worksheet:
-            gsheet_config = {"sheet_id": sheet_id, "worksheet_name": worksheet}
-            logger.info(f"Configured Google Sheets integration from recipe configuration: {gsheet_config}")
+    if recipe_meta.custom_analyzer_params and "google_sheets" in recipe_meta.custom_analyzer_params:
+        gs_params = recipe_meta.custom_analyzer_params["google_sheets"]
+        if isinstance(gs_params, dict):
+            sheet_id = gs_params.get('sheet_id')
+            worksheet_name = gs_params.get('worksheet_name')
+            if sheet_id and worksheet_name:
+                gsheet_config = {"sheet_id": sheet_id, "worksheet_name": worksheet_name}
+                logger.info(f"Configured Google Sheets integration from custom_analyzer_params: {gsheet_config}")
     
     # Get behavior flags
     skip_detailed_temporal_processing_for_recipe = False
