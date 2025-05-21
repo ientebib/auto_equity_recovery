@@ -100,9 +100,11 @@ async def test_call_openai_error():
     with patch("lead_recovery.summarizer.settings.OPENAI_API_KEY", "fake-key"):
         summarizer = ConversationSummarizer()
         
-        # Mock the AsyncOpenAI client to raise an error
+        # Mock the AsyncOpenAI client to raise an error on both attempts
         mock_client = AsyncMock()
-        mock_client.responses.create.side_effect = Exception("API Error")
+        api_exception = Exception("API Error")
+        mock_client.responses.create.side_effect = api_exception
+        mock_client.chat.completions.create.side_effect = api_exception # Mock fallback too
         
         with patch.object(summarizer, '_async_client', mock_client):
             messages = [{"role": "system", "content": "You are a helpful assistant"}]
@@ -117,7 +119,13 @@ async def test_summarize_with_validation_failure():
     with patch("lead_recovery.summarizer.settings.OPENAI_API_KEY", "fake-key"):
         # Set up expected keys for validation
         expected_keys = ["key1", "key2", "key3"]
-        summarizer = ConversationSummarizer(expected_yaml_keys=expected_keys)
+        # Pass keys via meta_config
+        mock_meta_config = {
+            "llm_config": {
+                "expected_llm_keys": {k: {} for k in expected_keys} # Create a dict structure similar to meta.yml
+            }
+        }
+        summarizer = ConversationSummarizer(meta_config=mock_meta_config)
         
         # Create mock conversation DataFrame
         conv_df = pd.DataFrame({
@@ -149,7 +157,13 @@ async def test_summarize_success():
     with patch("lead_recovery.summarizer.settings.OPENAI_API_KEY", "fake-key"):
         # Set up expected keys for validation
         expected_keys = ["key1", "key2", "key3"]
-        summarizer = ConversationSummarizer(expected_yaml_keys=expected_keys)
+        # Pass keys via meta_config
+        mock_meta_config = {
+            "llm_config": {
+                "expected_llm_keys": {k: {} for k in expected_keys} # Create a dict structure similar to meta.yml
+            }
+        }
+        summarizer = ConversationSummarizer(meta_config=mock_meta_config)
         
         # Create mock conversation DataFrame
         conv_df = pd.DataFrame({
