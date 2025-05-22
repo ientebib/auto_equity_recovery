@@ -19,6 +19,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential, wait_random
 from .cache import SummaryCache, compute_conversation_digest  # Import cache utilities
 from .config import settings
 from .exceptions import ApiError, ValidationError  # Import custom errors
+from .constants import SENDER_COLUMN_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -301,7 +302,7 @@ class ConversationSummarizer:
         try:
             # Format conversation text 
             conversation_text = "\\n".join(
-                f"[{str(getattr(row, 'creation_time', 'Unknown Time'))[:19]}] {getattr(row, 'msg_from', 'Unknown Sender')}: {getattr(row, 'message', 'No Message')}"
+                f"[{str(getattr(row, 'creation_time', 'Unknown Time'))[:19]}] {getattr(row, SENDER_COLUMN_NAME, 'Unknown Sender')}: {getattr(row, 'message', 'No Message')}"
                 for row in conv_df.itertuples(index=False)
             )
 

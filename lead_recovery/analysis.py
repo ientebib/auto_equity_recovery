@@ -24,6 +24,7 @@ from .config import settings
 from .constants import (
     CLEANED_PHONE_COLUMN_NAME,
     MESSAGE_COLUMN_NAME,
+    SENDER_COLUMN_NAME,
 )
 from .exceptions import ApiError, LeadRecoveryError, RecipeConfigurationError, ValidationError
 from .fs import update_link
@@ -35,9 +36,6 @@ from .utils import log_memory_usage, optimize_dataframe
 from .yaml_validator import YamlValidator
 
 logger = logging.getLogger(__name__)
-
-# Define missing constant
-SENDER_COLUMN_NAME = "msg_from"
 
 
 def _load_input_data(output_dir: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
