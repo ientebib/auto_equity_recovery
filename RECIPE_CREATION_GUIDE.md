@@ -99,7 +99,7 @@ The pipeline may also create additional files:
 - `your_recipe_name_analysis_YYYYMMDD.csv` - Dated copies of analysis results
 - `your_recipe_name_analysis_YYYYMMDD.html` - HTML report version
 - `your_recipe_name_analysis_YYYYMMDD_report.csv` - Specialized report format
-- `cache.csv` - Cache data to avoid reprocessing unchanged conversations
+- `data/cache/summary_cache.sqlite` - SQLite cache storing conversation summaries
 
 - The pipeline will automatically create the `output_run/your_recipe_name/` directory when needed
 - Each run creates a new timestamped subfolder to preserve history

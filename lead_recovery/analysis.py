@@ -587,9 +587,7 @@ async def run_summarization_step(
                     cache_records.append(data)
                     
             if cache_records:
-                cache_df = pd.DataFrame(cache_records)
-                cache_path = output_dir / "cache.csv"
-                cache_df.to_csv(cache_path, index=False)
+                cache.bulk_set(cache_records, summarizer.model, recipe_name=recipe_name)
                 logger.info(f"Updated cache with {len(cache_records)} records")
         
         # Upload to Google Sheets if configured
