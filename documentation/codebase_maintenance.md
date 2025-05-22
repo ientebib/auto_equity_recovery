@@ -77,7 +77,7 @@ The following components are no longer used or have been replaced:
 
 2. **Legacy Directory**
    - The `legacy/` directory contains old recipe versions that are no longer maintained.
-   - This can be safely deleted if those recipes are no longer needed.
+   - It is not removed automatically by `cleanup.sh`. Delete it manually if the recipes are no longer needed.
 
 3. **Test Output Directory**
    - `test_output_run/` is used only for testing and can be deleted.

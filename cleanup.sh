@@ -13,22 +13,14 @@ rm -v debug_output.log debug_recipe.log skip_test.log 2>/dev/null
 # 3. Clean __pycache__ directories
 find . -type d -name "__pycache__" -exec rm -rf {} +
 
-# 4. Remove the legacy directory if it's not needed
-echo "The 'legacy' directory contains old recipe versions."
-read -p "Remove the legacy directory? (y/n): " remove_legacy
-if [ "$remove_legacy" == "y" ]; then
-  rm -rf legacy
-  echo "Legacy directory removed."
-fi
-
-# 5. Clean test output directory
+# 4. Clean test output directory
 read -p "Remove test_output_run directory? (y/n): " remove_test
 if [ "$remove_test" == "y" ]; then
   rm -rf test_output_run
   echo "test_output_run directory removed."
 fi
 
-# 6. Optional: Clean old output runs
+# 5. Optional: Clean old output runs
 read -p "Remove old output runs (keeping the latest for each recipe)? (y/n): " remove_old_outputs
 if [ "$remove_old_outputs" == "y" ]; then
   # For each recipe directory in output_run
@@ -50,10 +42,10 @@ if [ "$remove_old_outputs" == "y" ]; then
   done
 fi
 
-# 7. Cleanup old log files in root (older than 14 days)
+# 6. Cleanup old log files in root (older than 14 days)
 read -p "Remove log files older than 14 days? (y/n): " remove_old_logs
 if [ "$remove_old_logs" == "y" ]; then
   find . -maxdepth 1 -name "*.log" -type f -mtime +14 -delete -print
 fi
 
-echo "Cleanup completed!" 
+echo "Cleanup completed!"

@@ -45,8 +45,8 @@ These phases have successfully:
 - Provided templates and examples for different recipe types
 
 #### 5. Recipe Migration
-- Created a `legacy/recipes` directory for deprecated recipes
-- Moved inactive recipes to the legacy directory
+- Created a `legacy/recipes` directory for deprecated recipes (kept for reference; not removed by `cleanup.sh`)
+- Moved inactive recipes to this directory
 - Successfully migrated all active recipes to the new schema:
   - `simulation_to_handoff`
   - `fede_abril_preperfilamiento`
