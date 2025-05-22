@@ -591,60 +591,61 @@ class SummaryCache:
         finally:
             conn.close()
             
-    def load_all_cached_results(self) -> Dict[str, Dict[str, Any]]:
-        """Load all cached results for a specific model.
-        
+    def load_all_cached_results(
+        self, batch_size: int = 100
+    ) -> Dict[str, Dict[str, Any]]:
+        """Load cached results in batches to reduce memory usage.
+
+        Args:
+            batch_size: Number of rows to load per fetch.
+
         Returns:
-            Dictionary mapping phone numbers to their cached summaries
+            Dictionary mapping phone numbers to their cached summaries.
         """
         try:
             conn = self._get_connection()
             cursor = conn.cursor()
             
-            # Get all cached entries (latest model version for each digest)
-            cursor.execute(
-                """
-                SELECT conversation_digest, yaml_summary, model_version, cleaned_phone
-                FROM summary_cache
-                WHERE created_ts > datetime('now', ?)
-                """,
-                (f"-{self.max_age_days} days",)
+            query = (
+                "SELECT conversation_digest, yaml_summary, model_version, cleaned_phone "
+                "FROM summary_cache WHERE created_ts > datetime('now', ?)"
             )
-            
-            results = {}
-            for row in cursor.fetchall():
-                digest, yaml_str, model, phone = row
-                
-                # Parse YAML string back to dict
-                try:
-                    import yaml
-                    summary = yaml.safe_load(yaml_str)
-                    
-                    # Get phone from row or summary if available
-                    if phone:
-                        phone_key = phone
-                    elif "cleaned_phone" in summary:
-                        phone_key = summary["cleaned_phone"]
-                    else:
-                        continue  # Skip entries without a phone number
-                        
-                    # Add the digest to the summary for tracking
-                    summary["conversation_digest"] = digest
-                    results[phone_key] = summary
-                    
-                    # Update last_accessed_ts for this entry
-                    now = datetime.now().isoformat()
-                    cursor.execute(
-                        "UPDATE summary_cache SET last_accessed_ts = ? WHERE conversation_digest = ?",
-                        (now, digest)
-                    )
-                    
-                except Exception as e:
-                    logger.warning(f"Failed to parse cached summary for digest {digest}: {e}")
-                    continue
-            
-            # Commit the updates to last_accessed_ts
-            conn.commit()        
+            cursor.execute(query, (f"-{self.max_age_days} days",))
+
+            results: Dict[str, Dict[str, Any]] = {}
+
+            while True:
+                rows = cursor.fetchmany(batch_size)
+                if not rows:
+                    break
+
+                for digest, yaml_str, model, phone in rows:
+                    try:
+                        import yaml
+                        summary = yaml.safe_load(yaml_str)
+
+                        if phone:
+                            phone_key = phone
+                        elif "cleaned_phone" in summary:
+                            phone_key = summary["cleaned_phone"]
+                        else:
+                            continue
+
+                        summary["conversation_digest"] = digest
+                        results[phone_key] = summary
+
+                        now = datetime.now().isoformat()
+                        cursor.execute(
+                            "UPDATE summary_cache SET last_accessed_ts = ? WHERE conversation_digest = ?",
+                            (now, digest),
+                        )
+                    except Exception as e:
+                        logger.warning(
+                            f"Failed to parse cached summary for digest {digest}: {e}"
+                        )
+                        continue
+
+            conn.commit()
             return results
         except sqlite3.OperationalError as e:
             logger.warning(f"SQLite operational error in load_all_cached_results(): {e}")
