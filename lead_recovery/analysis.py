@@ -88,7 +88,7 @@ async def _process_conversations(
     convos_df: pd.DataFrame,
     processor_runner: ProcessorRunner | None,
     prompt_template_path: Path | None,
-    max_workers: int,
+    max_workers: int | None,
     use_cache: bool,
     cached_results: dict[str, dict],
     conversation_digests: dict[str, str],
@@ -110,7 +110,7 @@ async def _process_conversations(
     )
     validator = YamlValidator(meta_config=meta_config)
 
-    if max_workers is None:
+    if max_workers is None or max_workers <= 0:
         max_workers = min(32, max(4, os.cpu_count() or 4))
     logger.info("Using max_workers=%s for concurrent processing", max_workers)
 
@@ -355,7 +355,7 @@ async def run_summarization_step(
             convos_df,
             processor_runner,
             prompt_template_path,
-            max_workers if max_workers is not None else 0,
+            max_workers,
             use_cache,
             cached_results,
             conversation_digests,
