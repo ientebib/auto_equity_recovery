@@ -30,7 +30,7 @@ class ConversationSummarizer:
         model: str = "o4-mini",
         max_tokens: int = 4096,
         prompt_template_path: str | Path | None = None,
-        use_cache: bool = True,
+        use_cache: bool = False,
         cache_dir: Path | None = None,
         meta_config: Optional[Dict[str, Any]] = None # Add meta_config
     ):
@@ -283,12 +283,7 @@ class ConversationSummarizer:
     
         except OpenAI_APIError as e:
             logger.error("OpenAI API Error: %s", e)
-            # Re-wrap as our ApiError with original error message
-            raise ApiError(f"OpenAI API Error: {e}")
-        except Exception as e:
-            logger.error("Unexpected error in OpenAI call: %s", e, exc_info=True)
-            # Re-wrap as our ApiError
-            raise ApiError(f"Unexpected error in OpenAI call: {e}")
+            raise
 
     async def summarize(self, conv_df: pd.DataFrame, temporal_flags: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Generates a summary by calling the LLM and returning the basic parsed result.
@@ -427,11 +422,30 @@ class ConversationSummarizer:
                     cleaned_text = clean_response_text(raw_summary_text, yaml_terminator_key=self.yaml_terminator_key)
                     parsed_data = parse_yaml_dict(cleaned_text)
                 except ValueError as second_e:
-                    logger.error(f"Both YAML parsing attempts failed. First error: {e}, Second error: {second_e}")
-                    logger.error(f"Raw response from second attempt:\n{raw_summary_text[:500]}...")
-                    raise ValidationError(f"Failed to parse YAML response after multiple attempts: {second_e}", 
-                                         raw_response=raw_summary_text) from second_e
-            
+                    logger.error(
+                        f"Both YAML parsing attempts failed. First error: {e}, Second error: {second_e}"
+                    )
+                    logger.error(
+                        f"Raw response from second attempt:\n{raw_summary_text[:500]}..."
+                    )
+                    raise ValidationError(
+                        f"Failed to parse YAML response after multiple attempts: {second_e}",
+                        raw_response=raw_summary_text,
+                    ) from second_e
+
+            # Validate required keys if provided in meta_config
+            expected_keys = (
+                set(
+                    self.meta_config.get("llm_config", {})
+                    .get("expected_llm_keys", {})
+                    .keys()
+                )
+            )
+            if expected_keys:
+                missing = expected_keys - parsed_data.keys()
+                if missing:
+                    raise ValidationError(f"Missing keys: {missing}")
+
             # Successfully parsed - attach cache helper fields
             parsed_data["conversation_digest"] = conversation_digest
             parsed_data["last_message_ts"] = last_query_timestamp

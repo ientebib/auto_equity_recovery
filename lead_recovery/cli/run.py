@@ -9,7 +9,7 @@ from typing import Dict, List, Optional
 import typer
 
 from ..config import settings
-from ..exceptions import RecipeNotFoundError, RecipeConfigurationError
+from ..exceptions import RecipeConfigurationError, RecipeNotFoundError
 from ..recipe_loader import RecipeLoader
 from ..recipe_schema import RecipeMeta
 from .report import report

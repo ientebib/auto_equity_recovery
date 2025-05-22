@@ -29,7 +29,7 @@ from .exceptions import ApiError, LeadRecoveryError, RecipeConfigurationError, V
 from .fs import update_link
 from .gsheets import upload_to_google_sheets
 from .processor_runner import ProcessorRunner
-from .reporting import export_data, to_csv
+from .reporting import export_data
 from .summarizer import ConversationSummarizer
 from .utils import log_memory_usage, optimize_dataframe
 from .yaml_validator import YamlValidator
