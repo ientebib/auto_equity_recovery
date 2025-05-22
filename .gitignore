@@ -166,4 +166,4 @@ legacy/
 mock_conversations/
 *.log
 *.marker gcp_service_account_key.json
-**/leads.csv
+data/cache/*.sqlite
