@@ -185,6 +185,7 @@ For more detailed information, refer to the following documentation:
 * [Recipe Creation Guide](RECIPE_CREATION_GUIDE.md) - How to create and configure recipes
 * [PROMPTING_AND_YAML_GUIDE.md](PROMPTING_AND_YAML_GUIDE.md) - Guide to LLM prompting and configuration
 * [Codebase Maintenance](documentation/codebase_maintenance.md) - Guide for maintaining and cleaning up the codebase
+* [Dashboard Service Setup](documentation/dashboard_service_setup.md) - Configure the macOS launch agent
 
 ## Debugging Insights (Key Learnings)
 

@@ -8,22 +8,24 @@
     <array>
         <string>/bin/bash</string>
         <string>-c</string>
-        <string>cd /Users/isaacentebi/Desktop/lead_recovery_project && source .env && /Users/isaacentebi/Desktop/lead_recovery_project/fresh_env/bin/streamlit run dashboard/app.py --server.address=0.0.0.0 --server.port=8501</string>
+        <string>cd "$PROJECT_DIR" && source .env && "$PROJECT_DIR"/fresh_env/bin/streamlit run dashboard/app.py --server.address=0.0.0.0 --server.port=8501</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
     <true/>
     <key>WorkingDirectory</key>
-    <string>/Users/isaacentebi/Desktop/lead_recovery_project</string>
+    <string>/path/to/lead_recovery_project</string>
     <key>StandardOutPath</key>
-    <string>/Users/isaacentebi/Desktop/lead_recovery_project/dashboard_log.out</string>
+    <string>/path/to/lead_recovery_project/dashboard_log.out</string>
     <key>StandardErrorPath</key>
-    <string>/Users/isaacentebi/Desktop/lead_recovery_project/dashboard_log.err</string>
+    <string>/path/to/lead_recovery_project/dashboard_log.err</string>
     <key>EnvironmentVariables</key>
     <dict>
+        <key>PROJECT_DIR</key>
+        <string>/path/to/lead_recovery_project</string>
         <key>PATH</key>
-        <string>/Users/isaacentebi/Desktop/lead_recovery_project/fresh_env/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <string>$PROJECT_DIR/fresh_env/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
     </dict>
 </dict>
 </plist> 
