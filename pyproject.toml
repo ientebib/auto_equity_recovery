@@ -48,11 +48,12 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "pytest", 
+    "pytest",
+    "pytest-asyncio",
     "pytest-cov",
-    "black", 
-    "isort", 
-    "ruff", 
+    "black",
+    "isort",
+    "ruff",
     "pre-commit",
     "pip-tools"
 ]
