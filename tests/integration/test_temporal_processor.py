@@ -45,11 +45,12 @@ def main():
     """Run test for both cases"""
     # Initialize the processor with valid RecipeMeta parameters
     mock_recipe_config = RecipeMeta(
+        recipe_schema_version=2,
         recipe_name="test_recipe",
         version="1.0",
         description="Test recipe",
         data_input=DataInputConfig(
-            lead_source_type="redshift", 
+            lead_source_type="redshift",
             redshift_config=DataInputSQL(sql_file="test.sql")
         ),
         output_columns=["test_column"]
