@@ -329,8 +329,12 @@ async def run_summarization_step(
                                     initial_results={}
                                 )
                                 if completed == 0:
-                                    print(f"[DEBUG] Processor results for {phone}: {processor_results}")
-                                logger.debug(f"ProcessorRunner results for {phone}: {list(processor_results.keys())}")
+                                    logger.debug(
+                                        f"Processor results for {phone}: {processor_results}"
+                                    )
+                                logger.debug(
+                                    f"ProcessorRunner results for {phone}: {list(processor_results.keys())}"
+                                )
                             except Exception as e:
                                 logger.error(f"Error running processors for {phone}: {e}", exc_info=True)
                                 processor_results = {}  # Use empty results on error
@@ -340,7 +344,7 @@ async def run_summarization_step(
                             temporal_flags=processor_results  # Pass processor results to LLM
                         )
                         if completed == 0:
-                            print(f"[DEBUG] LLM result for {phone}: {llm_result}")
+                            logger.debug(f"LLM result for {phone}: {llm_result}")
                         # STEP 3: Validate and fix LLM output
                         validated_result = yaml_validator.fix_yaml(
                             llm_result, 
@@ -432,7 +436,7 @@ async def run_summarization_step(
                 row_data["summary"] = "No conversation data found"
             
             if len(result_rows) == 0:
-                print(f"[DEBUG] Final row_data for {phone}: {row_data}")
+                logger.debug(f"Final row_data for {phone}: {row_data}")
             result_rows.append(row_data)
         
         # Create final DataFrame
