@@ -218,19 +218,33 @@ def _merge_results(
     summaries: dict[str, dict],
     errors: dict[str, str],
 ) -> pd.DataFrame:
-    rows = []
-    for _, lead in leads_df.iterrows():
-        phone = lead[CLEANED_PHONE_COLUMN_NAME]
-        data = lead.to_dict()
-        if phone in summaries:
-            data.update(summaries[phone])
-        elif phone in errors:
-            data["error"] = errors[phone]
-        else:
-            data["summary"] = "No conversation data found"
-        rows.append(data)
-    df = pd.DataFrame(rows)
-    return optimize_dataframe(df)
+    """Merge lead information with processor summaries and errors efficiently."""
+
+    result_df = leads_df.copy()
+
+    if summaries:
+        summaries_df = (
+            pd.DataFrame.from_dict(summaries, orient="index")
+            .rename_axis(CLEANED_PHONE_COLUMN_NAME)
+            .reset_index()
+        )
+        result_df = result_df.merge(
+            summaries_df, on=CLEANED_PHONE_COLUMN_NAME, how="left"
+        )
+
+    if errors:
+        errors_df = pd.DataFrame(
+            list(errors.items()),
+            columns=[CLEANED_PHONE_COLUMN_NAME, "error"],
+        )
+        result_df = result_df.merge(errors_df, on=CLEANED_PHONE_COLUMN_NAME, how="left")
+
+    if "summary" not in result_df.columns:
+        result_df["summary"] = "No conversation data found"
+    else:
+        result_df["summary"] = result_df["summary"].fillna("No conversation data found")
+
+    return optimize_dataframe(result_df)
 
 
 def _export_results(
