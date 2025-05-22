@@ -13,6 +13,20 @@ These phases have successfully:
 - Created comprehensive documentation for the new architecture
 - Ensured backward compatibility while enabling future extensions
 
+## Repository Layout
+
+The repository is organized into several key directories:
+
+- `lead_recovery/` – core Python package with CLI commands and processors
+- `recipes/` – active recipe definitions
+- `documentation/` – guides and reference documents
+- `tests/` – automated tests for the pipeline
+- `scripts/` – helper scripts for running and deployment
+- `webui/` – small interface for viewing results
+- `data/` – sample data and caches used in development
+
+Deprecated recipes were previously placed in a `legacy/recipes` folder during migration, but this directory no longer exists.
+
 ## Phase 1: Recipe Configuration Standardization
 
 ### Objectives
@@ -45,8 +59,7 @@ These phases have successfully:
 - Provided templates and examples for different recipe types
 
 #### 5. Recipe Migration
-- Created a `legacy/recipes` directory for deprecated recipes
-- Moved inactive recipes to the legacy directory
+- Deprecated recipes were temporarily moved to a `legacy/recipes` directory during migration. This folder has since been removed from the repository.
 - Successfully migrated all active recipes to the new schema:
   - `simulation_to_handoff`
   - `fede_abril_preperfilamiento`
