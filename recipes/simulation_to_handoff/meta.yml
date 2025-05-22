@@ -33,6 +33,14 @@ llm_config:
     suggested_message_es:
       description: "Suggested follow-up message in Spanish, if applicable."
       type: str
+    conversation_digest:
+      description: "MD5 hash of the conversation content, used for caching."
+      type: str
+      is_optional: true
+    last_message_ts:
+      description: "Timestamp of the last message in the conversation, from LLM."
+      type: str
+      is_optional: true
   context_keys_from_python: [
     "HOURS_MINUTES_SINCE_LAST_USER_MESSAGE",
     "HOURS_MINUTES_SINCE_LAST_MESSAGE",
