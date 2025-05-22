@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pandas as pd
 import pytest
+import tenacity
 
 from lead_recovery.exceptions import ApiError, ValidationError
 from lead_recovery.summarizer import ConversationSummarizer
@@ -109,8 +110,12 @@ async def test_call_openai_error():
         with patch.object(summarizer, '_async_client', mock_client):
             messages = [{"role": "system", "content": "You are a helpful assistant"}]
             
-            with pytest.raises(ApiError, match="Unexpected error in OpenAI call"):
+            # The @retry decorator will catch the Exception and raise RetryError after 3 attempts
+            with pytest.raises(tenacity.RetryError) as e_info:
                 await summarizer._call_openai(messages)
+            # Optionally, check the last exception if needed
+            assert isinstance(e_info.value.last_attempt.exception(), Exception)
+            assert str(e_info.value.last_attempt.exception()) == "API Error"
 
 
 @pytest.mark.asyncio
