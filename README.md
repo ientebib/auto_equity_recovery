@@ -183,7 +183,7 @@ For more detailed information, refer to the following documentation:
 * [Execution Guide](documentation/execution_guide.md) - Complete guide to running recipes
 * [Python Processors Guide](documentation/python_processors_guide.md) - Documentation for all processors
 * [Recipe Creation Guide](RECIPE_CREATION_GUIDE.md) - How to create and configure recipes
-* [PROMPTING_AND_YAML_GUIDE.md](PROMPTING_AND_YAML_GUIDE.md) - Guide to LLM prompting and configuration
+* [Writing Effective Prompts](documentation/guides/creating_recipes/writing_effective_prompts.md) - Guide to LLM prompting and configuration
 * [Codebase Maintenance](documentation/codebase_maintenance.md) - Guide for maintaining and cleaning up the codebase
 
 ## Debugging Insights (Key Learnings)
@@ -194,7 +194,7 @@ For more detailed information, refer to the following documentation:
     *   `output_columns`: Defines the **final columns** in the output CSV. List all desired columns here (lead info, LLM fields, desired Python-generated columns).
 *   **Processors vs. LLM Output**: Processors generate columns independently from the LLM analysis. The columns they generate appear in the final output only if listed in `output_columns`.
 *   **Skipped Processors & Output**: If a processor is skipped via a CLI flag, but its columns are still listed in `output_columns`, the columns *will appear* in the CSV (often with N/A or empty values).
-*   **Guides**: Refer to `PROMPTING_AND_YAML_GUIDE.md` and `RECIPE_CREATION_GUIDE.md` for detailed configuration and creation instructions.
+*   **Guides**: Refer to `documentation/guides/creating_recipes/writing_effective_prompts.md` and `RECIPE_CREATION_GUIDE.md` for detailed configuration and creation instructions.
 
 ## Recipe Creation and Standardization
 
