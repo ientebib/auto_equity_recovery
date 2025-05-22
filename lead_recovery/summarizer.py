@@ -433,6 +433,10 @@ class ConversationSummarizer:
                         raw_response=raw_summary_text,
                     ) from second_e
 
+            # Add cache helper fields EARLY before validation
+            parsed_data["conversation_digest"] = conversation_digest
+            parsed_data["last_message_ts"] = last_query_timestamp
+
             # Validate required keys if provided in meta_config
             expected_keys = (
                 set(
@@ -446,9 +450,9 @@ class ConversationSummarizer:
                 if missing:
                     raise ValidationError(f"Missing keys: {missing}")
 
-            # Successfully parsed - attach cache helper fields
-            parsed_data["conversation_digest"] = conversation_digest
-            parsed_data["last_message_ts"] = last_query_timestamp
+            # Successfully parsed - attach cache helper fields (already attached)
+            # parsed_data["conversation_digest"] = conversation_digest
+            # parsed_data["last_message_ts"] = last_query_timestamp
             
             # Save to cache if enabled
             if self.use_cache and self._cache:

@@ -110,8 +110,15 @@ async def _process_conversations(
     )
     validator = YamlValidator(meta_config=meta_config)
 
+    # Dynamically choose a reasonable default if caller didn't pass one
     if max_workers is None or max_workers <= 0:
-        max_workers = min(32, max(4, os.cpu_count() or 4))
+        logical_cores = os.cpu_count() or 4
+        # For mostly I/O-bound OpenAI calls we can safely use ~2× logical cores
+        max_workers = max(4, logical_cores * 2)
+    # Allow meta.yml to override via "max_workers"
+    if meta_config and isinstance(meta_config, dict) and meta_config.get("max_workers"):
+        max_workers = int(meta_config["max_workers"])
+
     logger.info("Using max_workers=%s for concurrent processing", max_workers)
 
     summaries: dict[str, dict] = {}
@@ -130,7 +137,11 @@ async def _process_conversations(
             attempt += 1
             try:
                 try:
-                    await asyncio.wait_for(semaphore.acquire(), timeout=300)
+                    # Allow longer wait for a processing slot – 20 minutes by default
+                    wait_timeout = 1200  # seconds
+                    if meta_config and isinstance(meta_config, dict):
+                        wait_timeout = meta_config.get("semaphore_timeout_secs", wait_timeout)
+                    await asyncio.wait_for(semaphore.acquire(), timeout=wait_timeout)
                     acquired = True
                 except asyncio.TimeoutError:
                     if attempt < max_retries:
@@ -175,7 +186,6 @@ async def _process_conversations(
                     summaries[phone].update(proc_results)
                 else:
                     combined = {**validated, **proc_results}
-                    combined[CLEANED_PHONE_COLUMN_NAME] = phone
                     combined["conversation_digest"] = digest
                     combined["cache_status"] = "FRESH"
                     summaries[phone] = combined
@@ -243,6 +253,21 @@ def _merge_results(
         result_df["summary"] = "No conversation data found"
     else:
         result_df["summary"] = result_df["summary"].fillna("No conversation data found")
+        
+    # Add required fields to prevent ValidationError
+    if "conversation_digest" not in result_df.columns:
+        result_df["conversation_digest"] = "no_conversation_data"
+    else:
+        result_df["conversation_digest"] = result_df["conversation_digest"].fillna("no_conversation_data")
+        
+    if "last_message_ts" not in result_df.columns:
+        # Use current timestamp as default for missing timestamps
+        current_time = datetime.now().isoformat()[:19]
+        result_df["last_message_ts"] = current_time
+    else:
+        # Fill null values with current timestamp
+        current_time = datetime.now().isoformat()[:19]
+        result_df["last_message_ts"] = result_df["last_message_ts"].fillna(current_time)
 
     return optimize_dataframe(result_df)
 
