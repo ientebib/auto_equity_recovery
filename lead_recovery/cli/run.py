@@ -9,7 +9,7 @@ from typing import Dict, List, Optional
 import typer
 
 from ..config import settings
-from ..exceptions import RecipeNotFoundError
+from ..exceptions import RecipeNotFoundError, RecipeConfigurationError
 from ..recipe_loader import RecipeLoader
 from ..recipe_schema import RecipeMeta
 from .report import report
@@ -133,10 +133,13 @@ def load_recipe_config(recipe_name: str, recipe_dir: Path, skip_processors: Opti
         return recipe_meta
         
     except Exception as e:
-        logger.error(f"Error loading recipe configuration for {recipe_name}: {e}", exc_info=True)
-        # Return empty RecipeMeta as fallback
-        empty_meta = RecipeMeta(recipe_name=recipe_name)
-        return empty_meta
+        logger.error(
+            f"Error loading recipe configuration for {recipe_name}: {e}",
+            exc_info=True,
+        )
+        raise RecipeConfigurationError(
+            f"Failed to load recipe configuration for {recipe_name}"
+        ) from e
 
 def setup_sql_and_prompt_paths(recipe_dir: Path, recipe_meta: RecipeMeta) -> Dict[str, Path]:
     """Set up paths to SQL and prompt files based on the recipe configuration.
