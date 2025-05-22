@@ -37,13 +37,7 @@ def convert_df_to_message_list(conversation_df: Optional[pd.DataFrame]) -> List[
     """
     if conversation_df is None or conversation_df.empty:
         return []
-    
-    message_list = []
-    
-    for _, row in conversation_df.iterrows():
-        message = {}
-        for col in row.index:
-            message[col] = row[col]
-        message_list.append(message)
-    
-    return message_list 
+
+    # Use pandas' vectorized conversion to avoid slow ``iterrows``
+    # iteration when dealing with large DataFrames.
+    return conversation_df.to_dict(orient="records")
