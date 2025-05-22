@@ -20,15 +20,29 @@ class YamlValidator:
         """
         self.meta_config = meta_config or {}
         logger.info(f"YamlValidator initialized with meta_config keys: {list(self.meta_config.keys())}")
-        # Support both old and new schema
+        # Determine which keys are required vs optional
+        self.expected_yaml_keys: set[str] = set()
+        self.optional_yaml_keys: set[str] = set()
+
         if 'expected_yaml_keys' in self.meta_config:
+            # Legacy flat list version (all considered *required*)
             self.expected_yaml_keys = set(self.meta_config.get('expected_yaml_keys', []))
-        elif 'expected_llm_keys' in self.meta_config:
-            self.expected_yaml_keys = set(self.meta_config['expected_llm_keys'].keys())
-        elif 'llm_config' in self.meta_config and 'expected_llm_keys' in self.meta_config['llm_config']:
-            self.expected_yaml_keys = set(self.meta_config['llm_config']['expected_llm_keys'].keys())
         else:
-            self.expected_yaml_keys = set()
+            # Newer hierarchical format under expected_llm_keys
+            if 'expected_llm_keys' in self.meta_config:
+                llm_keys_cfg = self.meta_config['expected_llm_keys']
+            else:
+                llm_keys_cfg = (
+                    self.meta_config.get('llm_config', {})
+                    .get('expected_llm_keys', {})
+                )
+
+            if llm_keys_cfg:
+                for key_name, field_cfg in llm_keys_cfg.items():
+                    if isinstance(field_cfg, dict) and field_cfg.get('is_optional', False):
+                        self.optional_yaml_keys.add(key_name)
+                    else:
+                        self.expected_yaml_keys.add(key_name)
         # Extract validation_enums if present, else auto-extract from llm_config.expected_llm_keys
         if 'validation_enums' in self.meta_config:
             self.validation_enums = self.meta_config['validation_enums']
@@ -53,12 +67,12 @@ class YamlValidator:
         actual_keys = set(parsed_data.keys())
 
         # Key validation
-        if self.expected_yaml_keys:
-            missing_keys = self.expected_yaml_keys - actual_keys
+        if self.expected_yaml_keys or self.optional_yaml_keys:
+            missing_keys = self.expected_yaml_keys - actual_keys  # Only required keys
             if missing_keys:
                 validation_errors.append(f"Missing keys: {missing_keys}")
             
-            extra_keys = actual_keys - self.expected_yaml_keys
+            extra_keys = actual_keys - (self.expected_yaml_keys | self.optional_yaml_keys)
             if extra_keys:
                 logger.warning("Found extra keys in YAML output: %s", extra_keys)
         else:

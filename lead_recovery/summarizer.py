@@ -437,16 +437,19 @@ class ConversationSummarizer:
             parsed_data["conversation_digest"] = conversation_digest
             parsed_data["last_message_ts"] = last_query_timestamp
 
-            # Validate required keys if provided in meta_config
-            expected_keys = (
-                set(
-                    self.meta_config.get("llm_config", {})
-                    .get("expected_llm_keys", {})
-                    .keys()
-                )
+            # Determine REQUIRED keys (ignore ones marked as optional in meta.yml)
+            llm_expected_cfg = (
+                self.meta_config.get("llm_config", {})
+                .get("expected_llm_keys", {})
             )
-            if expected_keys:
-                missing = expected_keys - parsed_data.keys()
+            required_keys: set[str] = set()
+            if isinstance(llm_expected_cfg, dict):
+                for k, cfg in llm_expected_cfg.items():
+                    if not (isinstance(cfg, dict) and cfg.get("is_optional", False)):
+                        required_keys.add(k)
+
+            if required_keys:
+                missing = required_keys - parsed_data.keys()
                 if missing:
                     raise ValidationError(f"Missing keys: {missing}")
 
