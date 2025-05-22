@@ -22,7 +22,12 @@ def update_link(src: Path, link: Path):
     try:
         # Python ≥3.8: missing_ok avoids FileNotFoundError
         link.unlink(missing_ok=True)
-        link.symlink_to(src.relative_to(link.parent))
+        try:
+            target = src.relative_to(link.parent)
+        except ValueError:  # src is outside link.parent
+            logger.debug("Source %s outside %s; using absolute path", src, link.parent)
+            target = src
+        link.symlink_to(target)
     except Exception as e:  # pragma: no cover – fallback when symlinks not allowed
         logger.debug("Symlink failed (%s). Falling back to file copy for %s", e, link)
         try:
