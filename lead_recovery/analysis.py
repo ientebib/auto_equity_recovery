@@ -451,6 +451,9 @@ async def run_summarization_step(
             if sheet_id and worksheet_name:
                 try:
                     credentials_path = settings.GOOGLE_CREDENTIALS_PATH
+                    # Fall back to GOOGLE_APPLICATION_CREDENTIALS if GOOGLE_CREDENTIALS_PATH is not set
+                    if credentials_path is None:
+                        credentials_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
                     upload_path = dated_paths.get("json") or (output_dir / "latest.csv")
                     upload_to_google_sheets(upload_path, sheet_id, worksheet_name, credentials_path)
                 except Exception as e:

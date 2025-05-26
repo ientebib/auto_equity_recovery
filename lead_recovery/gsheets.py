@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
+import os
 
 import gspread
 import pandas as pd
@@ -33,8 +34,11 @@ def upload_to_google_sheets(csv_path: Path, sheet_id: str, worksheet_name: str, 
     # Use credentials_path if provided, otherwise use settings
     if credentials_path is None:
         credentials_path = settings.GOOGLE_CREDENTIALS_PATH
+        # Fall back to GOOGLE_APPLICATION_CREDENTIALS if GOOGLE_CREDENTIALS_PATH is not set
         if credentials_path is None:
-            raise ConfigurationError("No Google credentials path provided. Set GOOGLE_CREDENTIALS_PATH in .env or pass credentials_path.")
+            credentials_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+        if credentials_path is None:
+            raise ConfigurationError("No Google credentials path provided. Set GOOGLE_CREDENTIALS_PATH in .env or GOOGLE_APPLICATION_CREDENTIALS environment variable.")
     
     upload_start_time = datetime.now(timezone.utc).astimezone()  # Get current time
     upload_timestamp_str = upload_start_time.strftime('%Y-%m-%d %H:%M:%S %Z')

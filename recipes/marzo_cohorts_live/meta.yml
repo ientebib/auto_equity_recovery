@@ -110,4 +110,9 @@ output_columns:
   # Meta data at the end
   - last_user_message_text
   - last_kuna_message_text
-  - last_message_sender 
+  - last_message_sender
+
+custom_analyzer_params:
+  google_sheets:
+    sheet_id: "1IAka0FRGDosnFsUJoVPK-JRRpi8fo0OlIzeqXNHTMh4"
+    worksheet_name: "Data clientes live v2" 
