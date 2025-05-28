@@ -17,13 +17,13 @@ This guide provides comprehensive instructions for executing recipes using the s
 The standard way to run any recipe in the Lead Recovery Pipeline is through the main CLI command:
 
 ```bash
-python -m lead_recovery.cli.main run --recipe <recipe_name> [OPTIONS]
+python3 -m lead_recovery.cli.main run --recipe <recipe_name> [OPTIONS]
 ```
 
 For example, to run the `simulation_to_handoff` recipe:
 
 ```bash
-python -m lead_recovery.cli.main run --recipe simulation_to_handoff
+python3 -m lead_recovery.cli.main run --recipe simulation_to_handoff
 ```
 
 ## CLI Options Reference
@@ -55,13 +55,13 @@ The Lead Recovery Pipeline uses a modular processor architecture to analyze conv
 To skip one or more processors during execution:
 
 ```bash
-python -m lead_recovery.cli.main run --recipe simulation_to_handoff --skip-processor TemporalProcessor
+python3 -m lead_recovery.cli.main run --recipe simulation_to_handoff --skip-processor TemporalProcessor
 ```
 
 You can skip multiple processors by specifying the option multiple times:
 
 ```bash
-python -m lead_recovery.cli.main run --recipe simulation_to_handoff --skip-processor TemporalProcessor --skip-processor HandoffProcessor
+python3 -m lead_recovery.cli.main run --recipe simulation_to_handoff --skip-processor TemporalProcessor --skip-processor HandoffProcessor
 ```
 
 ### Run Only Specific Processors
@@ -69,13 +69,13 @@ python -m lead_recovery.cli.main run --recipe simulation_to_handoff --skip-proce
 To run only certain processors, excluding all others:
 
 ```bash
-python -m lead_recovery.cli.main run --recipe simulation_to_handoff --run-only-processor MessageMetadataProcessor
+python3 -m lead_recovery.cli.main run --recipe simulation_to_handoff --run-only-processor MessageMetadataProcessor
 ```
 
 You can specify multiple processors to run by repeating the option:
 
 ```bash
-python -m lead_recovery.cli.main run --recipe simulation_to_handoff --run-only-processor MessageMetadataProcessor --run-only-processor HandoffProcessor
+python3 -m lead_recovery.cli.main run --recipe simulation_to_handoff --run-only-processor MessageMetadataProcessor --run-only-processor HandoffProcessor
 ```
 
 ### Available Processors
@@ -126,7 +126,7 @@ output_run/<recipe_name>/
 You can override this using the `--output-dir` option:
 
 ```bash
-python -m lead_recovery.cli.main run --recipe simulation_to_handoff --output-dir /custom/path
+python3 -m lead_recovery.cli.main run --recipe simulation_to_handoff --output-dir /custom/path
 ```
 
 ### Column Control
@@ -139,7 +139,7 @@ Control which columns appear in the output using:
 Example:
 
 ```bash
-python -m lead_recovery.cli.main run --recipe simulation_to_handoff --include-columns "cleaned_phone,summary,next_action_code"
+python3 -m lead_recovery.cli.main run --recipe simulation_to_handoff --include-columns "cleaned_phone,summary,next_action_code"
 ```
 
 **Note**: These options override the `output_columns` setting in the recipe's `meta.yml` file.
@@ -151,7 +151,7 @@ python -m lead_recovery.cli.main run --recipe simulation_to_handoff --include-co
 Process only the first 10 conversations:
 
 ```bash
-python -m lead_recovery.cli.main run --recipe simulation_to_handoff --limit 10
+python3 -m lead_recovery.cli.main run --recipe simulation_to_handoff --limit 10
 ```
 
 ### Skip Data Fetching (Use Existing Data)
@@ -159,7 +159,7 @@ python -m lead_recovery.cli.main run --recipe simulation_to_handoff --limit 10
 Use existing data files without fetching new data:
 
 ```bash
-python -m lead_recovery.cli.main run --recipe simulation_to_handoff --skip-redshift --skip-bigquery
+python3 -m lead_recovery.cli.main run --recipe simulation_to_handoff --skip-redshift --skip-bigquery
 ```
 
 ### Using a Custom Recipes Directory
@@ -167,7 +167,7 @@ python -m lead_recovery.cli.main run --recipe simulation_to_handoff --skip-redsh
 Run a recipe from a non-standard location:
 
 ```bash
-python -m lead_recovery.cli.main run --recipe simulation_to_handoff --recipes-dir /path/to/custom/recipes
+python3 -m lead_recovery.cli.main run --recipe simulation_to_handoff --recipes-dir /path/to/custom/recipes
 ```
 
 ### Skip LLM Summarization (Processor-Only Mode)
@@ -175,7 +175,7 @@ python -m lead_recovery.cli.main run --recipe simulation_to_handoff --recipes-di
 Run only the Python processors without calling the LLM:
 
 ```bash
-python -m lead_recovery.cli.main run --recipe simulation_to_handoff --skip-summarize
+python3 -m lead_recovery.cli.main run --recipe simulation_to_handoff --skip-summarize
 ```
 
 ### Full Production Run
@@ -183,7 +183,7 @@ python -m lead_recovery.cli.main run --recipe simulation_to_handoff --skip-summa
 Complete run with all stages:
 
 ```bash
-python -m lead_recovery.cli.main run --recipe simulation_to_handoff --no-cache
+python3 -m lead_recovery.cli.main run --recipe simulation_to_handoff --no-cache
 ```
 
 ### Debugging Specific Processors
@@ -191,7 +191,7 @@ python -m lead_recovery.cli.main run --recipe simulation_to_handoff --no-cache
 Run only the handoff analysis:
 
 ```bash
-python -m lead_recovery.cli.main run --recipe simulation_to_handoff --run-only-processor HandoffProcessor --skip-redshift --skip-bigquery --skip-summarize
+python3 -m lead_recovery.cli.main run --recipe simulation_to_handoff --run-only-processor HandoffProcessor --skip-redshift --skip-bigquery --skip-summarize
 ```
 
 ## Troubleshooting
@@ -223,11 +223,11 @@ python -m lead_recovery.cli.main run --recipe simulation_to_handoff --run-only-p
 For additional help on CLI options:
 
 ```bash
-python -m lead_recovery.cli.main run --help
+python3 -m lead_recovery.cli.main run --help
 ```
 
 For other commands available in the CLI:
 
 ```bash
-python -m lead_recovery.cli.main --help
+python3 -m lead_recovery.cli.main --help
 ``` 

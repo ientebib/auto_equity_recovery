@@ -87,7 +87,8 @@ def upload_to_google_sheets(csv_path: Path, sheet_id: str, worksheet_name: str, 
         # Clear the worksheet and upload new data
         worksheet.clear()
         # Write timestamp to A1
-        worksheet.update('A1', f"Last updated at: {upload_timestamp_str}")
+        timestamp_data = [[f"Last updated at: {upload_timestamp_str}"]]
+        worksheet.update('A1', timestamp_data)
         # Write DataFrame starting from A2
         set_with_dataframe(worksheet, df, row=2, col=1, include_index=False, include_column_header=True, resize=True)
         logger.info(f"Successfully uploaded data to worksheet '{worksheet_name}'")

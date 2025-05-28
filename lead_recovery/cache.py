@@ -83,6 +83,22 @@ class SummaryCache:
             ''')
             conn.commit() # Commit initial table creation
 
+            # NEW: Create completion tracking table
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS lead_completion_tracking (
+                    cleaned_phone TEXT PRIMARY KEY,
+                    recipe_name TEXT NOT NULL,
+                    conversation_digest TEXT NOT NULL,
+                    completion_status TEXT NOT NULL DEFAULT 'ACTIVE',
+                    completed_by TEXT,
+                    completed_ts TEXT,
+                    completion_notes TEXT,
+                    created_ts TEXT NOT NULL,
+                    last_updated_ts TEXT NOT NULL
+                )
+            ''')
+            conn.commit()
+
             # Columns that might be missing in older schemas
             columns_to_ensure = {
                 "cleaned_phone": "TEXT",
@@ -108,6 +124,11 @@ class SummaryCache:
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_recipe_name ON summary_cache(recipe_name)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_created_ts ON summary_cache(created_ts)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_last_accessed_ts ON summary_cache(last_accessed_ts)')
+            
+            # NEW: Create indexes for completion tracking
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_completion_recipe ON lead_completion_tracking(recipe_name)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_completion_status ON lead_completion_tracking(completion_status)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_completion_digest ON lead_completion_tracking(conversation_digest)')
             
             conn.commit()
         except sqlite3.Error as e:
@@ -650,6 +671,251 @@ class SummaryCache:
         except sqlite3.OperationalError as e:
             logger.warning(f"SQLite operational error in load_all_cached_results(): {e}")
             return {}
+        finally:
+            conn.close()
+
+    def mark_lead_complete(self, phone_number: str, recipe_name: str, conversation_digest: str, 
+                          completed_by: str, notes: Optional[str] = None) -> bool:
+        """Mark a lead as completed for a specific recipe.
+        
+        Args:
+            phone_number: The phone number of the lead
+            recipe_name: The recipe this completion applies to
+            conversation_digest: Current conversation digest when marked complete
+            completed_by: Who marked it complete (agent name/ID)
+            notes: Optional completion notes
+            
+        Returns:
+            True if successfully marked complete, False otherwise
+        """
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            
+            now = datetime.now().isoformat()
+            
+            cursor.execute(
+                """
+                INSERT OR REPLACE INTO lead_completion_tracking 
+                (cleaned_phone, recipe_name, conversation_digest, completion_status, 
+                 completed_by, completed_ts, completion_notes, created_ts, last_updated_ts)
+                VALUES (?, ?, ?, 'COMPLETED', ?, ?, ?, ?, ?)
+                """,
+                (phone_number, recipe_name, conversation_digest, completed_by, 
+                 now, notes, now, now)
+            )
+            conn.commit()
+            logger.info(f"Marked lead {phone_number} as complete for recipe {recipe_name}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error marking lead complete: {e}", exc_info=True)
+            return False
+        finally:
+            conn.close()
+
+    def get_lead_completion_status(self, phone_number: str, recipe_name: str, 
+                                 current_conversation_digest: str) -> Dict[str, Any]:
+        """Get completion status for a lead, checking if it should be reactivated.
+        
+        Args:
+            phone_number: The phone number of the lead
+            recipe_name: The recipe to check completion for
+            current_conversation_digest: Current conversation digest
+            
+        Returns:
+            Dictionary with completion status information
+        """
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute(
+                """
+                SELECT completion_status, conversation_digest, completed_by, 
+                       completed_ts, completion_notes, last_updated_ts
+                FROM lead_completion_tracking 
+                WHERE cleaned_phone = ? AND recipe_name = ?
+                """,
+                (phone_number, recipe_name)
+            )
+            result = cursor.fetchone()
+            
+            if not result:
+                return {
+                    "status": "ACTIVE",
+                    "is_completed": False,
+                    "needs_reactivation": False,
+                    "completion_info": None
+                }
+            
+            status, stored_digest, completed_by, completed_ts, notes, updated_ts = result
+            
+            # Check if conversation has changed since completion
+            conversation_changed = stored_digest != current_conversation_digest
+            
+            if status == "COMPLETED" and conversation_changed:
+                # Auto-reactivate due to conversation change
+                self._reactivate_lead(phone_number, recipe_name, current_conversation_digest, 
+                                    "Conversation updated since completion")
+                return {
+                    "status": "REACTIVATED",
+                    "is_completed": False,
+                    "needs_reactivation": True,
+                    "completion_info": {
+                        "previously_completed_by": completed_by,
+                        "previously_completed_ts": completed_ts,
+                        "previous_notes": notes,
+                        "reactivation_reason": "Conversation updated"
+                    }
+                }
+            
+            return {
+                "status": status,
+                "is_completed": status == "COMPLETED",
+                "needs_reactivation": False,
+                "completion_info": {
+                    "completed_by": completed_by,
+                    "completed_ts": completed_ts,
+                    "notes": notes,
+                    "conversation_digest": stored_digest
+                } if status == "COMPLETED" else None
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting completion status: {e}", exc_info=True)
+            return {
+                "status": "ACTIVE",
+                "is_completed": False,
+                "needs_reactivation": False,
+                "completion_info": None
+            }
+        finally:
+            conn.close()
+
+    def _reactivate_lead(self, phone_number: str, recipe_name: str, 
+                        new_conversation_digest: str, reason: str):
+        """Internal method to reactivate a completed lead."""
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            
+            now = datetime.now().isoformat()
+            
+            cursor.execute(
+                """
+                UPDATE lead_completion_tracking 
+                SET completion_status = 'REACTIVATED',
+                    conversation_digest = ?,
+                    completion_notes = COALESCE(completion_notes, '') || ' | REACTIVATED: ' || ?,
+                    last_updated_ts = ?
+                WHERE cleaned_phone = ? AND recipe_name = ?
+                """,
+                (new_conversation_digest, reason, now, phone_number, recipe_name)
+            )
+            conn.commit()
+            logger.info(f"Reactivated lead {phone_number} for recipe {recipe_name}: {reason}")
+            
+        except Exception as e:
+            logger.error(f"Error reactivating lead: {e}", exc_info=True)
+        finally:
+            conn.close()
+
+    def get_completed_leads_for_recipe(self, recipe_name: str) -> List[Dict[str, Any]]:
+        """Get all completed leads for a specific recipe.
+        
+        Args:
+            recipe_name: The recipe name to filter by
+            
+        Returns:
+            List of completion records
+        """
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute(
+                """
+                SELECT cleaned_phone, completion_status, conversation_digest,
+                       completed_by, completed_ts, completion_notes, last_updated_ts
+                FROM lead_completion_tracking 
+                WHERE recipe_name = ? AND completion_status IN ('COMPLETED', 'REACTIVATED')
+                ORDER BY last_updated_ts DESC
+                """,
+                (recipe_name,)
+            )
+            
+            results = []
+            for row in cursor.fetchall():
+                results.append({
+                    "phone": row[0],
+                    "status": row[1],
+                    "conversation_digest": row[2],
+                    "completed_by": row[3],
+                    "completed_ts": row[4],
+                    "notes": row[5],
+                    "last_updated_ts": row[6]
+                })
+            
+            return results
+            
+        except Exception as e:
+            logger.error(f"Error getting completed leads: {e}", exc_info=True)
+            return []
+        finally:
+            conn.close()
+
+    def get_completion_stats(self, recipe_name: Optional[str] = None) -> Dict[str, Any]:
+        """Get completion statistics.
+        
+        Args:
+            recipe_name: Optional recipe name to filter by
+            
+        Returns:
+            Dictionary with completion statistics
+        """
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            
+            base_query = "FROM lead_completion_tracking"
+            params = []
+            
+            if recipe_name:
+                base_query += " WHERE recipe_name = ?"
+                params.append(recipe_name)
+            
+            # Get total counts by status
+            cursor.execute(f"""
+                SELECT completion_status, COUNT(*) 
+                {base_query}
+                GROUP BY completion_status
+            """, params)
+            
+            status_counts = {row[0]: row[1] for row in cursor.fetchall()}
+            
+            # Get completion rate over time (last 30 days)
+            cursor.execute(f"""
+                SELECT DATE(completed_ts) as completion_date, COUNT(*) as daily_completions
+                {base_query}
+                {"AND" if recipe_name else "WHERE"} completion_status = 'COMPLETED' 
+                AND completed_ts > datetime('now', '-30 days')
+                GROUP BY DATE(completed_ts)
+                ORDER BY completion_date
+            """, params)
+            
+            daily_completions = [{"date": row[0], "count": row[1]} for row in cursor.fetchall()]
+            
+            return {
+                "status_counts": status_counts,
+                "daily_completions": daily_completions,
+                "total_tracked": sum(status_counts.values()),
+                "completion_rate": status_counts.get("COMPLETED", 0) / max(sum(status_counts.values()), 1)
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting completion stats: {e}", exc_info=True)
+            return {"status_counts": {}, "daily_completions": [], "total_tracked": 0, "completion_rate": 0}
         finally:
             conn.close()
 
