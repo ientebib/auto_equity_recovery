@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { 
   Phone, 
   Mail, 
@@ -29,69 +29,8 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 
-// Mock lead data - in real app this would come from API
-const mockLeads = [
-  {
-    id: '1',
-    name: 'María García',
-    email: 'maria.garcia@email.com',
-    phone: '+52 55 1234 5678',
-    action: 'LLAMAR_LEAD',
-    priority: 'high',
-    stallReason: 'Never Responded',
-    summary: 'Cliente nunca respondió al contacto inicial tras oferta preaprobada.',
-    suggestedMessage: 'Hola María, ¿pudiste revisar nuestra propuesta de préstamo? Estoy aquí para resolver cualquier duda.',
-    lastContact: '2 hours ago',
-    createdAt: '2024-01-15',
-    status: 'pending',
-    avatar: '/avatars/maria.jpg'
-  },
-  {
-    id: '2',
-    name: 'Carlos Rodríguez',
-    email: 'carlos.rodriguez@email.com',
-    phone: '+52 55 9876 5432',
-    action: 'MANEJAR_OBJECION',
-    priority: 'medium',
-    stallReason: 'Terms Issues',
-    summary: 'Cliente cuestiona tasas y términos del préstamo.',
-    suggestedMessage: 'Hola Carlos, entiendo tus dudas sobre los términos. ¿Te gustaría revisar otras opciones?',
-    lastContact: '1 day ago',
-    createdAt: '2024-01-14',
-    status: 'pending',
-    avatar: '/avatars/carlos.jpg'
-  },
-  {
-    id: '3',
-    name: 'Ana López',
-    email: 'ana.lopez@email.com',
-    phone: '+52 55 5555 1234',
-    action: 'CERRAR',
-    priority: 'low',
-    stallReason: 'Explicit Disinterest',
-    summary: 'Cliente declinó explícitamente la oferta.',
-    suggestedMessage: '',
-    lastContact: '3 days ago',
-    createdAt: '2024-01-12',
-    status: 'completed',
-    avatar: '/avatars/ana.jpg'
-  },
-  {
-    id: '4',
-    name: 'Luis Martínez',
-    email: 'luis.martinez@email.com',
-    phone: '+52 55 7777 8888',
-    action: 'CONTACTO_PRIORITARIO',
-    priority: 'high',
-    stallReason: 'Ghosting',
-    summary: 'Cliente dejó de responder hace 48h sin causa aparente.',
-    suggestedMessage: 'Hola Luis, necesitamos resolver tu consulta urgente. ¿Cuándo podemos hablar?',
-    lastContact: '6 hours ago',
-    createdAt: '2024-01-16',
-    status: 'pending',
-    avatar: '/avatars/luis.jpg'
-  }
-]
+// API base URL for backend
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 const getPriorityColor = (priority: string) => {
   switch (priority) {
@@ -119,11 +58,30 @@ const getActionColor = (action: string) => {
 }
 
 export function LeadGrid() {
+  const [leads, setLeads] = useState<any[]>([])
   const [selectedLead, setSelectedLead] = useState<any>(null)
   const [completedLeads, setCompletedLeads] = useState<Set<string>>(new Set())
   const [searchTerm, setSearchTerm] = useState('')
   const [filterPriority, setFilterPriority] = useState('all')
   const [filterStatus, setFilterStatus] = useState('all')
+
+  useEffect(() => {
+    const fetchLeads = async () => {
+      try {
+        const response = await fetch(`${API_URL}/leads/simulation_to_handoff?limit=1000`)
+        if (response.ok) {
+          const data = await response.json()
+          setLeads(data.leads)
+        } else {
+          console.error('Failed to fetch leads')
+        }
+      } catch (error) {
+        console.error('Error fetching leads:', error)
+      }
+    }
+
+    fetchLeads()
+  }, [])
 
   const handleMarkComplete = (leadId: string) => {
     setCompletedLeads(prev => new Set([...prev, leadId]))
@@ -134,7 +92,7 @@ export function LeadGrid() {
     // You could add a toast notification here
   }
 
-  const filteredLeads = mockLeads.filter(lead => {
+  const filteredLeads = leads.filter(lead => {
     const matchesSearch = lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          lead.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          lead.phone.includes(searchTerm)
@@ -196,7 +154,7 @@ export function LeadGrid() {
       {/* Results Summary */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-slate-600">
-          Showing {filteredLeads.length} of {mockLeads.length} leads
+          Showing {filteredLeads.length} of {leads.length} leads
         </p>
         <div className="flex items-center space-x-2">
           <Badge variant="outline" className="text-red-600 border-red-200">
