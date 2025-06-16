@@ -1,0 +1,90 @@
+# Empty meta.yml file - ready to build together 
+
+recipe_name: "formalizacion"
+version: "v4"
+description: "Recipe for analyzing conversations from the credit formalization phase"
+recipe_schema_version: 2
+
+data_input:
+  lead_source_type: csv
+  csv_config:
+    csv_file: "leads.csv"
+  conversation_sql_file_bigquery: "formalizacion_bigquery.sql"
+
+llm_config:
+  prompt_file: "prompt.txt"
+  expected_llm_keys:
+    resumen_general:
+      description: "Brief summary of what happened in the conversation"
+      type: str
+    documentos_enviados_analisis:
+      description: "Analysis of missing documents only"
+      type: str
+      enum_values: [
+        "Documentos completos", "Faltan: factura", "Faltan: tenencias", "Faltan: tarjeta circulacion", "Faltan: INE", "Faltan: comprobantes ingresos", "Faltan: varios documentos"
+      ]
+    enviado_a_validacion:
+      description: "Whether documents were sent to validation"
+      type: str
+      enum_values: ["Sí", "No"]
+    calidad_atencion_agente:
+      description: "Quality of agent attention"
+      type: str
+      enum_values: ["Excelente", "Buena", "Regular", "Mala"]
+    objecion_principal_cliente:
+      description: "Main client objection or concern"
+      type: str
+      enum_values: [
+        "Sin objeciones", "Logística GPS", "Documentos faltantes", "Preocupación financiera", "Desconfianza proceso", "Disponibilidad tiempo", "Problemas técnicos"
+      ]
+    gps_instalacion_agendada:
+      description: "GPS installation status"
+      type: str
+      enum_values: ["GPS agendado", "GPS completado", "GPS no agendado", "GPS pendiente"]
+    conversation_digest:
+      description: "MD5 hash of the conversation content, used for caching"
+      type: str
+      is_optional: true
+    last_message_ts:
+      description: "Timestamp of the last message in the conversation"
+      type: str
+      is_optional: true
+
+output_columns:
+  - agente
+  - asset_id
+  - nombre
+  - correo
+  - cleaned_phone
+  - lead_created_at
+  - resumen_general
+  - documentos_enviados_analisis
+  - enviado_a_validacion
+  - calidad_atencion_agente
+  - objecion_principal_cliente
+  - gps_instalacion_agendada
+  - HOURS_MINUTES_SINCE_LAST_USER_MESSAGE
+  - HOURS_MINUTES_SINCE_LAST_MESSAGE
+  - NO_USER_MESSAGES_EXIST
+  - last_user_message_text
+  - last_kuna_message_text
+  - last_message_sender
+
+custom_analyzer_params:
+  google_sheets:
+    sheet_id: "1nAU3lsPo98dTqaGOChhJM4WQKhyeItaqRGb5TvEFaXg"
+    worksheet_name: "Bot Live"
+
+context_keys_from_python: [
+  "HOURS_MINUTES_SINCE_LAST_USER_MESSAGE",
+  "HOURS_MINUTES_SINCE_LAST_MESSAGE",
+  "NO_USER_MESSAGES_EXIST"
+]
+
+python_processors:
+  - module: "lead_recovery.processors.temporal.TemporalProcessor"
+    params:
+      timezone: "America/Mexico_City"
+  - module: "lead_recovery.processors.metadata.MessageMetadataProcessor"
+    params:
+      max_message_length: 150 

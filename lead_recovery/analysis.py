@@ -373,9 +373,13 @@ async def run_summarization_step(
 
         processor_runner = None
         if recipe_name:
-            if not (meta_config and isinstance(meta_config, dict) and meta_config.get("python_processors") is not None):
+            if not (meta_config and isinstance(meta_config, dict)):
                 raise RecipeConfigurationError("Invalid or missing meta_config in analysis.py")
-            processor_runner = ProcessorRunner(recipe_config=meta_config)
+            
+            if meta_config.get("python_processors") is not None:
+                processor_runner = ProcessorRunner(recipe_config=meta_config)
+            else:
+                processor_runner = None
 
         output_columns = meta_config.get("output_columns") if meta_config and "output_columns" in meta_config else None
 

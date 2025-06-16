@@ -8,7 +8,7 @@ import logging
 import time
 from datetime import datetime  # Added for datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 import pytz  # Added for timezone
@@ -155,6 +155,13 @@ class ConversationSummarizer:
 
         # Initialize Async Client
         self._async_client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+
+    def _format_conversation(self, conv_df: pd.DataFrame) -> str:
+        """Format a conversation DataFrame into a single string."""
+        return "\\n".join(
+            f"[{str(getattr(row, 'creation_time', 'Unknown Time'))[:19]}] {getattr(row, SENDER_COLUMN_NAME, 'Unknown Sender')}: {getattr(row, 'message', 'No Message')}"
+            for row in conv_df.itertuples(index=False)
+        )
 
     # ------------------------------------------------------------------ #
     def estimate_tokens(self, messages: List[Dict[str, str]]) -> int:
@@ -335,13 +342,12 @@ class ConversationSummarizer:
             Does not perform validation against expected keys or enums - that's the caller's responsibility.
         """
         try:
-            # Format conversation text
-            conversation_text = "\\n".join(
-                f"[{str(getattr(row, 'creation_time', 'Unknown Time'))[:19]}] {getattr(row, SENDER_COLUMN_NAME, 'Unknown Sender')}: {getattr(row, 'message', 'No Message')}"
-                for row in conv_df.itertuples(index=False)
-            )
+            temporal_flags = temporal_flags or {}
 
-            # Compute digest for caching
+            # Format conversation and inject context variables
+            conversation_text = self._format_conversation(conv_df)
+
+            # Compute the conversation's digest
             conversation_digest = compute_conversation_digest(conversation_text)
 
             # Basic timestamp calculations for prompt formatting if needed
@@ -386,7 +392,7 @@ class ConversationSummarizer:
 
             # Check cache first if enabled
             if self.use_cache and self._cache:
-                cached_summary = self._cache.get(conversation_digest, self.model)
+                cached_summary = self._cache.get(conversation_digest)
                 if cached_summary is not None:
                     logger.info(
                         f"Using cached summary for conversation digest: {conversation_digest[:8]}..."
@@ -515,7 +521,7 @@ class ConversationSummarizer:
             # Save to cache if enabled
             if self.use_cache and self._cache:
                 try:
-                    self._cache.set(conversation_digest, parsed_data, self.model)
+                    self._cache.set(conversation_digest, parsed_data)
                     logger.debug(
                         f"Saved summary to cache with digest: {conversation_digest[:8]}..."
                     )
@@ -533,3 +539,9 @@ class ConversationSummarizer:
             logger.exception("Failed to summarise conversation: %s", e)
             # Wrap unknown errors - using 'from e' to preserve the original stack trace
             raise ApiError(f"Unexpected error during summarization: {e}") from e
+
+    async def _process_batch(
+        self, batch: List[Tuple[str, pd.DataFrame, Dict[str, Any]]]
+    ):
+        # Implementation of _process_batch method
+        pass

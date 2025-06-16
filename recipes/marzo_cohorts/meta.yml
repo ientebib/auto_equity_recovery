@@ -1,6 +1,6 @@
 recipe_name: "marzo_cohorts"
-version: "1.0"
-description: "Analyzes marzo cohorts of leads to understand why they stalled."
+version: "v17"
+description: "Recipe for analyzing leads that reached simulation but not handoff (Time Aware)"
 recipe_schema_version: 2
 
 data_input:
@@ -12,52 +12,84 @@ data_input:
 llm_config:
   prompt_file: "prompt.txt"
   expected_llm_keys:
+    summary:
+      description: "LLM generated summary of the conversation."
+      type: str
     primary_stall_reason_code:
-      description: "Code representing primary reason the lead stalled."
+      description: "Root cause for the stall, as determined by the LLM."
       type: str
-      enum_values:
-        - "VEHICULO_ANTIGUO_KM"
-        - "NO_PROPIETARIO"
-        - "VIN_EXTRANJERO"
-        - "ZONA_NO_CUBIERTA"
-        - "ADEUDO_VEHICULAR"
-        - "PROBLEMA_SEGUNDA_LLAVE"
-        - "PROBLEMA_TERMINOS"
-        - "GHOSTING"
-        - "ERROR_PROCESO_INTERNO"
-        - "RECHAZADO_POR_KUNA"
-        - "PRODUCTO_INCORRECTO_COMPRADOR"
-        - "OTHER_BUSINESS_PROCESS"
-        - "FINANCIAMIENTO_ACTIVO"
-        - "ADEUDO_VEHICULAR_MULTAS"
-        - "OTRO_PROCESO_DE_NEGOCIO"
-    summary_what_went_wrong:
-      description: "Summary of what went wrong in the lead process."
-      type: str
+      enum_values: [
+        "NUNCA_RESPONDIO", "FINANCIAMIENTO_ACTIVO", "VEHICULO_ANTIGUO_KM", "NO_PROPIETARIO", "VIN_EXTRANJERO", "ZONA_NO_CUBIERTA", "USUARIO_SIN_AUTO", "RECHAZADO_POR_KUNA", "PRODUCTO_INCORRECTO_COMPRADOR", "OTRO_PROCESO_DE_NEGOCIO", "DESINTERES_EXPLICITO", "ADEUDO_VEHICULAR_MULTAS", "PROBLEMA_SEGUNDA_LLAVE", "PROBLEMA_TERMINOS", "ERROR_PROCESO_INTERNO", "PROCESO_EN_CURSO", "GHOSTING", "OTRO"
+      ]
     transfer_context_analysis:
-      description: "Analysis of transfer context issues. Always 'N/A' for this recipe."
+      description: "Brief analysis of context around the human transfer, if applicable."
       type: str
-  context_keys_from_python:
-    - "last_message_sender"
-    - "last_user_message_text"
-    - "last_kuna_message_text"
-    - "handoff_invitation_detected"
-    - "handoff_finalized"
+    next_action_code:
+      description: "Recommended next action for the lead."
+      type: str
+      enum_values: [
+        "CERRAR", "ESPERAR", "LLAMAR_LEAD", "CONTACTO_PRIORITARIO", "MANEJAR_OBJECION", "INSISTIR", "ENVIAR_PLANTILLA_RECUPERACION"
+      ]
+    suggested_message_es:
+      description: "Suggested follow-up message in Spanish, if applicable."
+      type: str
+    conversation_digest:
+      description: "MD5 hash of the conversation content, used for caching."
+      type: str
+      is_optional: true
+    last_message_ts:
+      description: "Timestamp of the last message in the conversation, from LLM."
+      type: str
+      is_optional: true
+  context_keys_from_python: [
+    "HOURS_MINUTES_SINCE_LAST_USER_MESSAGE",
+    "HOURS_MINUTES_SINCE_LAST_MESSAGE",
+    "NO_USER_MESSAGES_EXIST",
+    "human_transfer",
+    "IS_WITHIN_REACTIVATION_WINDOW",
+    "IS_RECOVERY_PHASE_ELIGIBLE"
+  ]
 
 python_processors:
+  - module: "lead_recovery.processors.temporal.TemporalProcessor"
+    params:
+      timezone: "America/Mexico_City"
   - module: "lead_recovery.processors.metadata.MessageMetadataProcessor"
     params:
       max_message_length: 150
   - module: "lead_recovery.processors.handoff.HandoffProcessor"
     params: {}
+  - module: "lead_recovery.processors.template.TemplateDetectionProcessor"
+    params:
+      template_type: "recovery"
+  - module: "lead_recovery.processors.validation.ValidationProcessor"
+    params: {}
+  - module: "lead_recovery.processors.conversation_state.ConversationStateProcessor"
+    params: {}
+  - module: "lead_recovery.processors.human_transfer.HumanTransferProcessor"
+    params: {}
 
 output_columns:
   - cleaned_phone
+  - NO_USER_MESSAGES_EXIST
+  - summary
   - primary_stall_reason_code
-  - summary_what_went_wrong
+  - next_action_code
+  - suggested_message_es
+  - HOURS_MINUTES_SINCE_LAST_USER_MESSAGE
+  - HOURS_MINUTES_SINCE_LAST_MESSAGE
+  - human_transfer
   - transfer_context_analysis
-  - last_message_sender
+  - handoff_invitation_detected
+  - handoff_response
+  - handoff_finalized
+  - IS_WITHIN_REACTIVATION_WINDOW
+  - IS_RECOVERY_PHASE_ELIGIBLE
   - last_user_message_text
   - last_kuna_message_text
-  - handoff_invitation_detected
-  - handoff_finalized
+  - last_message_sender
+
+custom_analyzer_params:
+  google_sheets:
+    sheet_id: "1BficiDF4kGPZfww4KhgTrqduC0rTNzVY1sf8b_0mTew"
+    worksheet_name: "Data clientes historico v2"

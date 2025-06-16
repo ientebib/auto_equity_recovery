@@ -39,7 +39,7 @@ A beautiful, professional dashboard for managing AI-powered lead recovery campai
 ## 🛠️ Technology Stack
 
 ### Frontend
-- **Next.js 14** - React framework with App Router
+- **Next.js 15** - React framework with App Router
 - **TypeScript** - Type-safe development
 - **Tailwind CSS** - Utility-first CSS framework
 - **shadcn/ui** - Beautiful, accessible components
@@ -249,6 +249,17 @@ This project is part of the Lead Recovery system. See the main project license.
 2. Verify all dependencies are installed
 3. Ensure data files are in the correct format
 4. Contact the development team
+
+# Quick Start: Run Both Frontend and Backend
+
+To start both the backend and frontend servers at once (each in a new Terminal tab, macOS only):
+
+```bash
+./start_modern_dashboard.sh
+```
+
+- This script will open one tab for the backend (Python) and one for the frontend (Next.js/React).
+- Make sure you have run `chmod +x start_modern_dashboard.sh` once to make it executable.
 
 ---
 
