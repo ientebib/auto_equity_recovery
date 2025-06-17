@@ -137,13 +137,17 @@ You can override output columns at runtime with CLI flags:
    cd lead_recovery_project
    ```
 
-2. **Create and activate a virtual environment:**
+2. **Run the setup script to create the virtual environment and install dependencies:**
    ```bash
-   python -m venv fresh_env
-   source fresh_env/bin/activate  # On Windows: fresh_env\Scripts\activate
+   ./setup_env.sh
    ```
 
-3. **Install dependencies (choose one method):**
+   This script creates a `fresh_env` directory and installs everything from
+   `requirements.txt`, `requirements-dev.txt`, and the package itself in
+   editable mode. If you prefer to do this manually, create and activate the
+   environment then install dependencies as shown below.
+
+3. **Manual dependency installation (optional):**
    
    Using pip:
    ```bash
