@@ -49,6 +49,10 @@ llm_config:
       description: "Timestamp of the last message in the conversation"
       type: str
       is_optional: true
+  context_keys_from_python:
+    - "HOURS_MINUTES_SINCE_LAST_USER_MESSAGE"
+    - "HOURS_MINUTES_SINCE_LAST_MESSAGE"
+    - "NO_USER_MESSAGES_EXIST"
 
 output_columns:
   - agente
@@ -74,12 +78,6 @@ custom_analyzer_params:
   google_sheets:
     sheet_id: "1nAU3lsPo98dTqaGOChhJM4WQKhyeItaqRGb5TvEFaXg"
     worksheet_name: "Bot Live"
-
-context_keys_from_python: [
-  "HOURS_MINUTES_SINCE_LAST_USER_MESSAGE",
-  "HOURS_MINUTES_SINCE_LAST_MESSAGE",
-  "NO_USER_MESSAGES_EXIST"
-]
 
 python_processors:
   - module: "lead_recovery.processors.temporal.TemporalProcessor"
