@@ -13,6 +13,7 @@ This is the official, stable way to run this recipe.
 """
 
 import asyncio
+import importlib
 import os
 import subprocess
 import sys
@@ -24,7 +25,9 @@ import yaml
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, project_root)
 
-from lead_recovery.analysis import run_summarization_step
+run_summarization_step = importlib.import_module(
+    "lead_recovery.analysis"
+).run_summarization_step
 
 
 def _get_project_root() -> Path:
@@ -83,7 +86,7 @@ async def main():
     # so we need to copy it there first.
     os.makedirs(output_dir, exist_ok=True)
     subprocess.run(["cp", str(recipe_dir / "leads.csv"), str(output_dir / "leads.csv")])
-    
+
     # We must run this from the project root with PYTHONPATH set
     env = os.environ.copy()
     env["PYTHONPATH"] = str(root)
@@ -106,7 +109,9 @@ async def main():
             output_dir=output_dir,
             prompt_template_path=recipe_dir / "prompt.txt",
             recipe_name=recipe_name,
-            gsheet_config=meta_config.get("custom_analyzer_params", {}).get("google_sheets"),
+            gsheet_config=meta_config.get("custom_analyzer_params", {}).get(
+                "google_sheets"
+            ),
             meta_config=meta_config,
             use_cache=False,  # Force re-computation
         )
@@ -114,12 +119,17 @@ async def main():
     except Exception as e:
         print(f"❌ Summarization failed: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
 
     # --- Step 4: Final Upload Verification ---
     print("\n📤 Step 4: Verifying Google Sheets Upload...")
-    worksheet_name = meta_config.get("custom_analyzer_params", {}).get("google_sheets", {}).get("worksheet_name", "Bot Live")
+    worksheet_name = (
+        meta_config.get("custom_analyzer_params", {})
+        .get("google_sheets", {})
+        .get("worksheet_name", "Bot Live")
+    )
     print(f"   -> Pipeline attempts to upload to Google Sheet '{worksheet_name}'.")
     print("   -> Please verify the contents in Google Sheets.")
 
@@ -130,4 +140,4 @@ async def main():
 if __name__ == "__main__":
     if sys.platform == "win32":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-    asyncio.run(main()) 
+    asyncio.run(main())
