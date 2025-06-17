@@ -178,15 +178,10 @@ You can override output columns at runtime with CLI flags:
 
 ## Running Tests
 
-Install the development dependencies (includes `pytest-asyncio`) and ensure
-placeholder CSV files exist for recipes before running `pytest`:
+Install the development dependencies (includes `pytest-asyncio`) and run tests:
 
 ```bash
 pip install -r requirements-dev.txt
-touch recipes/marzo_cohorts_live/leads.csv
-touch recipes/fede_abril_preperfilamiento/leads.csv
-touch recipes/marzo_cohorts/leads.csv
-touch recipes/top_up_may/leads.csv
 pytest -q
 ```
 

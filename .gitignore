@@ -162,6 +162,7 @@ cython_debug/
 
 # Project specific
 recipes/*/output_run/
+recipes/*/leads.csv
 legacy/
 mock_conversations/
 *.log
